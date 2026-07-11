@@ -977,17 +977,30 @@ class Component extends DCLogic {
     return { nodes, edges };
   }
 
-  // export the whole map (background image + road graph) to a reusable .json file
+  // export the whole map (background image + road graph + labels) to a reusable .json file
   exportMap(){
-    const data = { version:1, name:'map', mapImage:this.state.mapImage, mapW:this.state.mapW, mapH:this.state.mapH,
-      graph:{ nodes:this.state.nodes, edges:this.state.edges }, savedAt:new Date().toISOString() };
-    try{
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'ban-do-' + Date.now() + '.json';
-      document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 2000);
-      this._toast(this.L().mapSaved);
-    }catch(e){ this._toast(this.L().copyFail); }
+    const finish = (mapImage)=>{
+      const data = { version:2, name:'map', mapImage, mapW:this.state.mapW, mapH:this.state.mapH,
+        graph:{ nodes:this.state.nodes, edges:this.state.edges, labels:this.state.labels||[] },
+        savedAt:new Date().toISOString() };
+      try{
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'ban-do-' + Date.now() + '.json';
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 2000);
+        this._toast(this.L().mapSaved);
+      }catch(e){ this._toast(this.L().copyFail); }
+    };
+    const img = this.state.mapImage;
+    // Nhúng ảnh thành data URL để file .json tự chứa (tải lại ở đâu cũng có ảnh).
+    if(img && !/^data:/.test(img)){
+      fetch(img).then(r=>r.blob()).then(blob=>{
+        const fr = new FileReader();
+        fr.onload = ()=>finish(fr.result);
+        fr.onerror = ()=>finish(img); // không nhúng được → giữ URL
+        fr.readAsDataURL(blob);
+      }).catch(()=>finish(img));
+    } else { finish(img); }
   }
   triggerLoadMap(){ if(this.mapFileRef.current) this.mapFileRef.current.click(); }
   loadMap(e){
@@ -999,9 +1012,11 @@ class Component extends DCLogic {
         const g = d.graph || {};
         const nodes = Array.isArray(g.nodes) ? g.nodes : [];
         const edges = Array.isArray(g.edges) ? g.edges : [];
+        // nhãn tên vị trí: hỗ trợ cả file mới (graph.labels) lẫn cũ (không có → rỗng)
+        const labels = Array.isArray(g.labels) ? g.labels : (Array.isArray(d.labels) ? d.labels : []);
         this.hist = [this._snap(nodes, edges)]; this.hptr = 0;
         this.setState({
-          nodes, edges, histIdx:0, histLen:1, penLast:null, connectFrom:null, selNode:null, selEdge:null,
+          nodes, edges, labels, histIdx:0, histLen:1, penLast:null, connectFrom:null, selNode:null, selEdge:null,
           mapImage: d.mapImage || this.state.mapImage, mapW: d.mapW || this.state.mapW, mapH: d.mapH || this.state.mapH,
         }, ()=>this._saveGraph());
         this._scheduleFit();

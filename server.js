@@ -68,6 +68,7 @@ function sanitizeIncomingSession(body) {
     mapH: Number(body.mapH) || 0,
     nodes: Array.isArray(body.nodes) ? body.nodes : [],
     edges: Array.isArray(body.edges) ? body.edges : [],
+    labels: Array.isArray(body.labels) ? body.labels : [],
     ownerPos: body.ownerPos || null,
     ownerLocked: !!body.ownerLocked,
     createdAt: Number(body.createdAt) || Date.now(),
@@ -119,7 +120,7 @@ app.post('/api/sessions', (req, res) => {
   // Nếu là cập nhật (chủ phiên chỉnh sửa lại ở màn tạo phiên), phát realtime
   // cho người xem đang kết nối để họ thấy ngay đồ thị / vị trí mới nhất.
   if (existed) {
-    broadcast(sess.token, { type: 'graph', nodes: sess.nodes, edges: sess.edges }, null);
+    broadcast(sess.token, { type: 'graph', nodes: sess.nodes, edges: sess.edges, labels: sess.labels }, null);
     broadcast(sess.token, { type: 'owner', pos: sess.ownerPos, locked: sess.ownerLocked }, null);
     if (sess.status === 'ended') broadcast(sess.token, { type: 'end' }, null);
   }
@@ -233,10 +234,12 @@ wss.on('connection', (ws) => {
     if (msg.type === 'owner') {
       store.patch(token, { ownerPos: msg.pos || null, ownerLocked: !!msg.locked });
     } else if (msg.type === 'graph') {
-      store.patch(token, {
+      const p = {
         nodes: Array.isArray(msg.nodes) ? msg.nodes : [],
         edges: Array.isArray(msg.edges) ? msg.edges : [],
-      });
+      };
+      if (Array.isArray(msg.labels)) p.labels = msg.labels;
+      store.patch(token, p);
     } else if (msg.type === 'end') {
       store.patch(token, { status: 'ended' });
     }

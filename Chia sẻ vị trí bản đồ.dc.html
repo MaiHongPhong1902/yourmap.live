@@ -372,6 +372,16 @@ window.MSNet = (function () {
 
             <!-- pins layer -->
             <div style="position:absolute;inset:0;pointer-events:none;">
+              <!-- location labels (tên vị trí) -->
+              <sc-for list="{{ labelsView }}" as="lb" hint-placeholder-count="0">
+                <div style="position:absolute;left:{{ lb.l }}%;top:{{ lb.t }}%;transform:translate(-50%,-140%) scale(calc(1/var(--z,1)));transform-origin:bottom center;pointer-events:none;">
+                  <div style="display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:8px;background:rgba(15,23,42,.86);color:#fff;font-size:.72rem;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.35);max-width:180px;overflow:hidden;text-overflow:ellipsis;">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" stroke-width="2.4" style="flex:none;"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    {{ lb.text }}
+                  </div>
+                  <div style="width:2px;height:8px;background:rgba(15,23,42,.86);margin:0 auto;"></div>
+                </div>
+              </sc-for>
               <sc-if value="{{ hasOwnerPin }}" hint-placeholder-val="{{ false }}">
                 <div style="position:absolute;left:{{ ownerPinL }}%;top:{{ ownerPinT }}%;transform:translate(-50%,-100%) scale(calc(1/var(--z,1)));transform-origin:bottom center;pointer-events:auto;cursor:{{ ownerPinCursor }};animation:pinpop .3s ease;" onPointerDown="{{ onOwnerPinDown }}">
                   <sc-if value="{{ ownerPinLive }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:50%;bottom:-4px;width:24px;height:24px;border-radius:50%;background:#dc2626;animation:ripple 1.4s ease-out infinite;"></div></sc-if>
@@ -443,7 +453,7 @@ class Component extends DCLogic {
     this.state = {
       screen:'home', lang:'vi',
       mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048,
-      nodes:[], edges:[],
+      nodes:[], edges:[], labels:[],
       tool:'pen', newBidir:true,
       connectFrom:null, selNode:null, selEdge:null, penLast:null,
       histIdx:0, histLen:1,
@@ -557,7 +567,7 @@ class Component extends DCLogic {
     this.setState({
       token, ownerToken: otoken || null,
       mapImage: sess.mapImage, mapW: sess.mapW, mapH: sess.mapH,
-      nodes: sess.nodes || [], edges: sess.edges || [],
+      nodes: sess.nodes || [], edges: sess.edges || [], labels: sess.labels || [],
       histIdx:0, histLen:1, penLast:null, connectFrom:null,
       ownerPos: sess.ownerPos || null, ownerLocked: !!sess.ownerLocked,
       expiresAt: sess.expiresAt || null,
@@ -575,7 +585,7 @@ class Component extends DCLogic {
     const next = Object.assign(cur, patch);
     try{ localStorage.setItem(this._key(t), JSON.stringify(next)); }catch(e){ this._toast(this.L().storageFull); }
   }
-  _saveGraph(){ this._save({ nodes: this.state.nodes, edges: this.state.edges }); this._send({type:'graph', nodes:this.state.nodes, edges:this.state.edges}); this._pushServer({ nodes:this.state.nodes, edges:this.state.edges }); this._pushHist(); }
+  _saveGraph(){ this._save({ nodes: this.state.nodes, edges: this.state.edges, labels: this.state.labels }); this._send({type:'graph', nodes:this.state.nodes, edges:this.state.edges, labels:this.state.labels}); this._pushServer({ nodes:this.state.nodes, edges:this.state.edges, labels:this.state.labels }); this._pushHist(); }
   // ---- undo / redo history (instance-based so it is immune to React batching) ----
   _snap(n, e){ return { nodes: JSON.parse(JSON.stringify(n||[])), edges: JSON.parse(JSON.stringify(e||[])) }; }
   _pushHist(){
@@ -685,7 +695,7 @@ class Component extends DCLogic {
     else if(msg.type === 'pong'){ this.peers[msg.peerId] = { role: msg.role, ts: Date.now() }; this._recount(); }
     else if(msg.type === 'bye'){ delete this.peers[msg.peerId]; this._recount(); }
     else if(msg.type === 'owner' && this._myRole !== undefined){ this.setState({ ownerPos: msg.pos, ownerLocked: msg.locked, ownerLive:true }); this._save({ownerPos:msg.pos, ownerLocked:msg.locked}); if(this.state.route) this._recomputeRoute(); setTimeout(()=>this.setState({ownerLive:false}), 1600); }
-    else if(msg.type === 'graph'){ this.setState({ nodes: msg.nodes, edges: msg.edges }); this._save({nodes:msg.nodes, edges:msg.edges}); }
+    else if(msg.type === 'graph'){ const patch = { nodes: msg.nodes, edges: msg.edges }; if(msg.labels) patch.labels = msg.labels; this.setState(patch); this._save(patch); }
     else if(msg.type === 'end'){ this.setState({ screen:'ended' }); }
   }
   _prunePeers(){ const now = Date.now(); let ch=false; for(const k in this.peers){ if(now - this.peers[k].ts > 6500){ delete this.peers[k]; ch=true; } } if(ch) this._recount(); }
@@ -770,7 +780,12 @@ class Component extends DCLogic {
         else this._addNode(r);
       }
       else if(st.tool === 'connect'){ this._connectClick(r); }
-      else if(st.tool === 'delete'){ const near = this._nearestNode(r); if(near && near.dist < 45) this._deleteNode(near.node.id); }
+      else if(st.tool === 'delete'){
+        const nearL = this._nearestLabel(r);
+        if(nearL && nearL.dist < 40){ this._deleteLabel(nearL.label.id); return; }
+        const near = this._nearestNode(r); if(near && near.dist < 45) this._deleteNode(near.node.id);
+      }
+      else if(st.tool === 'label'){ this._labelClick(r); }
       else if(st.tool === 'edit'){ const near = this._nearestNode(r); this.setState({ selNode: (near && near.dist < 45) ? near.node.id : null, selEdge:null }); }
     } else if(placingOwner){
       this.setState({ ownerPos:r }, ()=>{ if(st.screen==='owner') this._saveOwner(); });
@@ -793,6 +808,35 @@ class Component extends DCLogic {
     const nodes = this.state.nodes.filter(n => n.id !== id);
     const edges = this.state.edges.filter(e => e.from !== id && e.to !== id);
     this.setState({ nodes, edges, selNode:null }, ()=>this._saveGraph());
+  }
+  /* ---------------- location labels (đặt tên vị trí) ---------------- */
+  _nearestLabel(r){
+    let best=null, bd=Infinity;
+    for(const l of (this.state.labels||[])){
+      const dx=(l.xRatio-r.xRatio)*1000, dy=(l.yRatio-r.yRatio)*1000, d=Math.hypot(dx,dy);
+      if(d<bd){ bd=d; best=l; }
+    }
+    return best ? { label:best, dist:bd } : null;
+  }
+  _labelClick(r){
+    const near = this._nearestLabel(r);
+    if(near && near.dist < 40){ // chạm lại nhãn có sẵn → sửa/xóa
+      const txt = (window.prompt(this.L().labelEditPrompt, near.label.text) || '').trim();
+      if(txt === near.label.text) return;
+      if(!txt){ this._deleteLabel(near.label.id); return; }
+      const labels = this.state.labels.map(l => l.id===near.label.id ? {...l, text:txt} : l);
+      this.setState({ labels }, ()=>this._saveGraph());
+      return;
+    }
+    const txt = (window.prompt(this.L().labelPrompt, '') || '').trim();
+    if(!txt) return;
+    const id = 'l' + this._rid(4);
+    const labels = (this.state.labels||[]).concat([{ id, xRatio:r.xRatio, yRatio:r.yRatio, text:txt.slice(0,60) }]);
+    this.setState({ labels }, ()=>{ this._saveGraph(); this._toast(this.L().labelAdded); });
+  }
+  _deleteLabel(id){
+    const labels = (this.state.labels||[]).filter(l => l.id !== id);
+    this.setState({ labels }, ()=>{ this._saveGraph(); this._toast(this.L().labelRemoved); });
   }
   _nodeDown(id, e){
     e.stopPropagation();
@@ -1128,7 +1172,7 @@ class Component extends DCLogic {
     const sess = {
       token, ownerTokenHash: this._hash(ownerToken),
       mapImage:this.state.mapImage, mapW:this.state.mapW, mapH:this.state.mapH,
-      nodes:this.state.nodes, edges:this.state.edges,
+      nodes:this.state.nodes, edges:this.state.edges, labels:this.state.labels,
       ownerPos:this.state.ownerPos, ownerLocked:false,
       createdAt:Date.now(), expiresAt, hasPassword: !!pw, passwordHash: pw?this._hash(pw):null,
       status:'active',
@@ -1198,7 +1242,8 @@ class Component extends DCLogic {
         stepMapDesc:'Chọn ảnh bản đồ làm nền. Có thể dùng ảnh mẫu hoặc tải ảnh của bạn (PNG/JPG/WebP).', sampleMap:'Ảnh mẫu (aerial)', or:'hoặc', uploadMap:'Tải ảnh bản đồ của bạn',
         stepPosDesc:'Nhấn lên bản đồ để đặt vị trí của bạn (chủ phiên). Kéo ghim để chỉnh chính xác.', clearMarker:'Xóa vị trí',
         expiry:'Thời gian hết hạn', setPassword:'Đặt mật khẩu cho phiên', passwordPh:'Nhập mật khẩu…', linkWarn:'Ai có đường link đều xem được phiên. Owner link chứa quyền quản trị — giữ bí mật.', generate:'Tạo đường link chia sẻ', created:'Đã tạo phiên!', viewerLink:'Link người xem', ownerLink:'Link chủ phiên', keepSecret:'giữ bí mật', keepSecretShort:'bí mật', openOwner:'Chủ phiên', openGraph:'Vẽ đường', openViewer:'Người xem', copy:'Sao chép', copied:'Đã sao chép!',
-        graphTitle:'Vẽ bộ xương đường đi', graphTitleEn:'Road graph editor', toolNode:'Thêm điểm', toolConnect:'Nối đường', toolEdit:'Chọn / Kéo', toolDelete:'Xóa', oneWay:'Một chiều', twoWay:'Hai chiều', newEdgeDir:'Đường mới:', showHelp:'Nhấn ảnh để thêm điểm (node) — nhấn lên một đoạn đã có để chèn điểm vào giữa. Chuyển sang "Nối đường" rồi nhấn 2 điểm để tạo đoạn đường.', nodesEdges:'điểm · đoạn', clearAll:'Xóa tất cả', selectedEdge:'Đoạn đường đã chọn', weight:'Trọng số (khoảng cách)', blocked:'Chặn đoạn này', deleteEdge:'Xóa đoạn', graphCleared:'Đã xóa road graph', selectedNode:'Điểm đã chọn', deleteNode:'Xóa điểm', connectHint:'Đã chọn điểm đầu — nhấn điểm tiếp theo (hoặc nhấn lên đường) để nối. Nhấn lại điểm đó để dừng.', connectHelp:'Nhấn hai điểm để nối. Nhấn thẳng lên một đường có sẵn sẽ tự chèn điểm tại đó. Đường cắt nhau tự tạo điểm giao.', noSelection:'Chưa chọn đối tượng nào. Nhấn một điểm hoặc đoạn đường.',
+        graphTitle:'Vẽ bộ xương đường đi', graphTitleEn:'Road graph editor', toolNode:'Thêm điểm', toolConnect:'Nối đường', toolEdit:'Chọn / Kéo', toolLabel:'Đặt tên', toolDelete:'Xóa',
+        labelPrompt:'Nhập tên cho vị trí này:', labelEditPrompt:'Sửa tên vị trí (để trống để xóa):', labelHelp:'Nhấn lên bản đồ để đặt tên cho một vị trí. Nhấn lại nhãn để sửa hoặc xóa.', labelAdded:'Đã thêm tên vị trí', labelRemoved:'Đã xóa tên vị trí', oneWay:'Một chiều', twoWay:'Hai chiều', newEdgeDir:'Đường mới:', showHelp:'Nhấn ảnh để thêm điểm (node) — nhấn lên một đoạn đã có để chèn điểm vào giữa. Chuyển sang "Nối đường" rồi nhấn 2 điểm để tạo đoạn đường.', nodesEdges:'điểm · đoạn', clearAll:'Xóa tất cả', selectedEdge:'Đoạn đường đã chọn', weight:'Trọng số (khoảng cách)', blocked:'Chặn đoạn này', deleteEdge:'Xóa đoạn', graphCleared:'Đã xóa road graph', selectedNode:'Điểm đã chọn', deleteNode:'Xóa điểm', connectHint:'Đã chọn điểm đầu — nhấn điểm tiếp theo (hoặc nhấn lên đường) để nối. Nhấn lại điểm đó để dừng.', connectHelp:'Nhấn hai điểm để nối. Nhấn thẳng lên một đường có sẵn sẽ tự chèn điểm tại đó. Đường cắt nhau tự tạo điểm giao.', noSelection:'Chưa chọn đối tượng nào. Nhấn một điểm hoặc đoạn đường.',
         ownerTitle:'Chủ phiên', ownerTitleEn:'Session owner', viewersOnline:'Người đang xem', timeLeft:'Còn lại', ownerSet:'Nhấn hoặc kéo để đặt vị trí của bạn.', ownerLockedLabel:'Vị trí đã khóa. Mở khóa để chỉnh.', lock:'Khóa vị trí', unlock:'Mở khóa để chỉnh', ownerHelp:'Vị trí của bạn được cập nhật theo thời gian thực cho mọi người đang mở cùng phiên.', endSession:'Kết thúc phiên', locked:'Đã khóa vị trí', sessionEnded:'Phiên đã kết thúc',
         viewerTitle:'Người xem', viewerTitleEn:'Viewer', sessActive:'Phiên đang hoạt động', sessExpiring:'Phiên sắp hết hạn', ownerReady:'Chủ phiên đã ghim vị trí', ownerWaiting:'Chủ phiên chưa đặt vị trí…', pick:'Chọn vị trí của tôi', picking:'Nhấn lên bản đồ…', useGps:'Dùng vị trí GPS', findRoute:'Chỉ đường', clearRoute:'Xóa đường đi', distance:'Khoảng cách ước tính', hops:'điểm trên tuyến', pickHint:'Nhấn lên bản đồ để đặt điểm bắt đầu.',
         errNoOwner:'Chủ phiên chưa đặt vị trí.', errNoViewer:'Hãy chọn vị trí bắt đầu của bạn trước.', errNoGraph:'Bản đồ chưa có đủ đường đi (cần ít nhất 2 điểm).', errNoPath:'Không tìm được đường nối giữa hai điểm.', needOwnerPos:'Hãy đặt vị trí chủ phiên trước.', viewerOpened:'Đã mở tab người xem', demoReady:'Demo sẵn sàng — hãy vẽ đường & mở link người xem', pickHint2:'', nodeOnEdge:'Đã chèn điểm vào đoạn đường có sẵn', undo:'Hoàn tác', redo:'Làm lại', toolPen:'Bút vẽ đường', penHint:'Vẽ đường liền mạch bằng cách nhấn nối tiếp', penOn:'Đang bật — nhấn để tắt', penHelp:'Nhấn lên bản đồ để bắt đầu vẽ. Mỗi lần nhấn thêm một điểm và tự nối với điểm trước.', penContinue:'Nhấn tiếp để kéo dài đường · nhấn lại điểm cuối (hoặc Esc) để kết thúc nét.', saveMap:'Lưu bản đồ', loadMap:'Tải bản đồ', mapSaved:'Đã lưu bản đồ ra file JSON', mapLoaded:'Đã tải bản đồ từ file', badFile:'File không hợp lệ', copyFail:'Link đã được bôi chọn — nhấn Ctrl/Cmd+C để sao chép', storageFull:'Ảnh quá lớn để đồng bộ giữa các tab.', gpsUnavailable:'Ảnh bản đồ chưa được georeference nên GPS không khả dụng — hãy chọn thủ công.',
@@ -1210,7 +1255,8 @@ class Component extends DCLogic {
         stepMapDesc:'Choose a background map image. Use the sample or upload your own (PNG/JPG/WebP).', sampleMap:'Sample (aerial)', or:'or', uploadMap:'Upload your map image',
         stepPosDesc:'Click the map to set your position (owner). Drag the pin to fine-tune.', clearMarker:'Clear marker',
         expiry:'Expiry', setPassword:'Set a session password', passwordPh:'Enter password…', linkWarn:'Anyone with the link can view. The owner link grants admin rights — keep it secret.', generate:'Create share link', created:'Session created!', viewerLink:'Viewer link', ownerLink:'Owner link', keepSecret:'keep secret', keepSecretShort:'secret', openOwner:'Owner', openGraph:'Roads', openViewer:'Viewer', copy:'Copy', copied:'Copied!',
-        graphTitle:'Draw the road graph', graphTitleEn:'Bộ xương đường đi', toolNode:'Add node', toolConnect:'Connect', toolEdit:'Select / Move', toolDelete:'Delete', oneWay:'One-way', twoWay:'Two-way', newEdgeDir:'New edge:', showHelp:'Click the map to add nodes — click an existing edge to insert a node onto it. Switch to "Connect" and click two nodes to make a road.', nodesEdges:'nodes · edges', clearAll:'Clear all', selectedEdge:'Selected edge', weight:'Weight (distance)', blocked:'Block this edge', deleteEdge:'Delete edge', graphCleared:'Road graph cleared', selectedNode:'Selected node', deleteNode:'Delete node', connectHint:'First node chosen — click the next node (or a road) to connect. Click it again to stop.', connectHelp:'Click two nodes to connect. Click directly on an existing road to insert a point there. Crossing roads auto-create an intersection node.', noSelection:'Nothing selected. Click a node or edge.',
+        graphTitle:'Draw the road graph', graphTitleEn:'Bộ xương đường đi', toolNode:'Add node', toolConnect:'Connect', toolEdit:'Select / Move', toolLabel:'Label', toolDelete:'Delete',
+        labelPrompt:'Enter a name for this spot:', labelEditPrompt:'Edit name (leave empty to delete):', labelHelp:'Tap the map to name a spot. Tap a label again to edit or remove it.', labelAdded:'Location label added', labelRemoved:'Location label removed', oneWay:'One-way', twoWay:'Two-way', newEdgeDir:'New edge:', showHelp:'Click the map to add nodes — click an existing edge to insert a node onto it. Switch to "Connect" and click two nodes to make a road.', nodesEdges:'nodes · edges', clearAll:'Clear all', selectedEdge:'Selected edge', weight:'Weight (distance)', blocked:'Block this edge', deleteEdge:'Delete edge', graphCleared:'Road graph cleared', selectedNode:'Selected node', deleteNode:'Delete node', connectHint:'First node chosen — click the next node (or a road) to connect. Click it again to stop.', connectHelp:'Click two nodes to connect. Click directly on an existing road to insert a point there. Crossing roads auto-create an intersection node.', noSelection:'Nothing selected. Click a node or edge.',
         ownerTitle:'Session owner', ownerTitleEn:'Chủ phiên', viewersOnline:'Viewers online', timeLeft:'Time left', ownerSet:'Click or drag to set your position.', ownerLockedLabel:'Position locked. Unlock to edit.', lock:'Lock position', unlock:'Unlock to edit', ownerHelp:'Your position updates in real time for everyone in this session.', endSession:'End session', locked:'Position locked', sessionEnded:'Session ended',
         viewerTitle:'Viewer', viewerTitleEn:'Người xem', sessActive:'Session active', sessExpiring:'Session expiring soon', ownerReady:'Owner pinned a location', ownerWaiting:'Owner has not set a position yet…', pick:'Choose my location', picking:'Click the map…', useGps:'Use GPS location', findRoute:'Get directions', clearRoute:'Clear route', distance:'Estimated distance', hops:'points on route', pickHint:'Click the map to set your start point.',
         errNoOwner:'Owner has not set a position.', errNoViewer:'Choose your start location first.', errNoGraph:'The map needs at least 2 connected nodes.', errNoPath:'No route found between the two points.', needOwnerPos:'Set the owner position first.', viewerOpened:'Viewer tab opened', demoReady:'Demo ready — draw roads & open the viewer link', pickHint2:'', nodeOnEdge:'Node inserted onto the existing edge', undo:'Undo', redo:'Redo', toolPen:'Pen (draw roads)', penHint:'Draw continuous roads by clicking', penOn:'Active — click to turn off', penHelp:'Click the map to start drawing. Each click adds a node and links it to the previous one.', penContinue:'Keep clicking to extend the road · click the last point (or Esc) to finish.', saveMap:'Save map', loadMap:'Load map', mapSaved:'Map saved to a JSON file', mapLoaded:'Map loaded from file', badFile:'Invalid file', copyFail:'Link selected — press Ctrl/Cmd+C to copy', storageFull:'Image too large to sync across tabs.', gpsUnavailable:'Map is not georeferenced, GPS unavailable — pick manually.',
@@ -1331,7 +1377,7 @@ class Component extends DCLogic {
 
     // ---- instruction chip ----
     let instruction = s.mapPan;
-    if(editingGraph) instruction = st.tool==='pen' ? (st.penLast?s.penContinue:s.penHelp) : st.tool==='connect' ? (st.connectFrom?s.connectHint:s.connectHelp) : s.mapClickAdd;
+    if(editingGraph) instruction = st.tool==='pen' ? (st.penLast?s.penContinue:s.penHelp) : st.tool==='connect' ? (st.connectFrom?s.connectHint:s.connectHelp) : st.tool==='label' ? s.labelHelp : s.mapClickAdd;
     else if(ownerPinDrag) instruction = s.mapDragOwner;
     else if(isViewer && st.picking) instruction = s.mapPickViewer;
 
@@ -1410,6 +1456,7 @@ class Component extends DCLogic {
       mapImage:st.mapImage, imgRef:this.imgRef, viewBox:`0 0 1000 ${Math.round(vbH)}`, worldW: st.isMobile?520:760, worldAspect:`${st.mapW} / ${st.mapH}`,
       vpRef:this.vpRef, worldRef:this.worldRef, svgRef:this.svgRef, onImgLoad:()=>this._scheduleFit(),
       edgesView, nodesView, searchView, connectorsView, routePts, hasRoute,
+      labelsView: (st.labels||[]).map(l=>({ id:l.id, text:l.text, l:l.xRatio*100, t:l.yRatio*100 })),
       hasOwnerPin, ownerPinL: st.ownerPos?st.ownerPos.xRatio*100:0, ownerPinT: st.ownerPos?st.ownerPos.yRatio*100:0,
       ownerPinCursor: ownerPinDrag?'grab':'default', ownerPinLive: st.ownerLive, onOwnerPinDown:(e)=>{ if(!ownerPinDrag) return; e.stopPropagation(); this.drag={mode:'owner',moved:false,x:e.clientX,y:e.clientY}; },
       hasViewerPin, viewerPinL: st.viewerPos?st.viewerPos.xRatio*100:0, viewerPinT: st.viewerPos?st.viewerPos.yRatio*100:0,
@@ -1442,10 +1489,11 @@ class Component extends DCLogic {
       node:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>',
       connect:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.5 8.5l7 7"/></svg>',
       edit:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+      label:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H4a1 1 0 0 0-1 1v5a2 2 0 0 0 .59 1.42l9 9a2 2 0 0 0 2.82 0l5-5a2 2 0 0 0 0-2.82l-9-9A2 2 0 0 0 9 3z"/><circle cx="7.5" cy="7.5" r="1.3" fill="currentColor"/></svg>',
       delete:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>',
     };
     const penActive = st.tool === 'pen';
-    const penToggle = R('button',{ onClick:()=>this.setState({ tool: penActive?'edit':'pen', connectFrom:null, penLast:null }),
+    const penToggle = R('button',{ onClick:()=>this.setState({ tool: penActive?'node':'pen', connectFrom:null, penLast:null }),
       style:{ width:'100%',display:'flex',alignItems:'center',gap:11,padding:'12px 14px',borderRadius:12,
         border:'1.5px solid '+(penActive?'#dc2626':'#e2e8f0'), background:penActive?'#fef2f2':'#fff', cursor:'pointer', textAlign:'left' } },
       R('span',{ style:{ width:34,height:34,flex:'none',borderRadius:9,display:'grid',placeItems:'center', background:penActive?'#dc2626':'#f1f5f9', color:penActive?'#fff':'#475569' },
@@ -1457,7 +1505,7 @@ class Component extends DCLogic {
     const grid = R('div',{ style:{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:7 } },
       toolBtn('node', s.toolNode, icons.node),
       toolBtn('connect', s.toolConnect, icons.connect),
-      toolBtn('edit', s.toolEdit, icons.edit),
+      toolBtn('label', s.toolLabel, icons.label),
       toolBtn('delete', s.toolDelete, icons.delete));
 
     // new-edge direction toggle
@@ -1469,7 +1517,7 @@ class Component extends DCLogic {
 
     // help / connect hint
     const help = R('p',{ style:{ fontSize:'.8rem',color:'#94a3b8',lineHeight:1.5,margin:'2px 0' } },
-      st.tool==='pen' ? (st.penLast?s.penContinue:s.penHelp) : st.tool==='connect' ? (st.connectFrom?s.connectHint:s.connectHelp) : s.showHelp);
+      st.tool==='pen' ? (st.penLast?s.penContinue:s.penHelp) : st.tool==='connect' ? (st.connectFrom?s.connectHint:s.connectHelp) : st.tool==='label' ? s.labelHelp : s.showHelp);
 
     // stats
     const stats = R('div',{ style:{ display:'flex',gap:10 } },

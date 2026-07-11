@@ -101,6 +101,11 @@ window.MSNet = (function () {
     <!-- ----- LEFT / SHEET PANEL ----- -->
     <aside style="{{ panelStyle }}">
 
+      <!-- mobile: thanh kéo để đóng sheet -->
+      <sc-if value="{{ showSheetHandle }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ closeSheet }}" style="{{ sheetHandleStyle }}" aria-label="Đóng"><span style="{{ sheetGrabberStyle }}"></span></button>
+      </sc-if>
+
       <!-- HOME -->
       <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
         <div style="padding:34px 30px;max-width:640px;margin:0 auto;animation:fadeup .5s ease;">
@@ -400,6 +405,14 @@ window.MSNet = (function () {
         </div>
       </div>
     </sc-if>
+
+    <!-- mobile: nút icon mở bảng điều khiển (map hiện full) -->
+    <sc-if value="{{ showSheetFab }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ openSheet }}" style="{{ sheetFabStyle }}">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+        <span>{{ sheetFabLabel }}</span>
+      </button>
+    </sc-if>
   </div>
 
   <!-- toast -->
@@ -443,7 +456,7 @@ class Component extends DCLogic {
       searchSegs:[], searchStep:0,
       viewerCount:0, now:Date.now(), expiresAt:null,
       toast:null, isMobile: window.innerWidth < 860,
-      copied:'',
+      copied:'', sheetOpen:false,
     };
   }
 
@@ -508,7 +521,7 @@ class Component extends DCLogic {
     const raw = (location.hash || '').replace(/^#\/?/, '');
     const seg = raw.split('/').filter(Boolean);
     if(seg.length === 0){ this.setState({ screen:'home' }); this._teardownChannel(); return; }
-    if(seg[0] === 'create'){ this.setState({ screen:'create' }); this._teardownChannel(); return; }
+    if(seg[0] === 'create'){ this.setState({ screen:'create', sheetOpen:true }); this._teardownChannel(); return; }
     if(seg[0] === 's' && seg[1]){
       const token = seg[1];
       const sess = this._load(token);
@@ -530,7 +543,8 @@ class Component extends DCLogic {
       if((role === 'owner' || role === 'graph') && !isOwner){ this.setState({ screen:'denied' }); return; }
       this._applySession(token, sess, otoken);
       const screen = role === 'graph' ? 'graph' : role === 'owner' ? 'owner' : 'viewer';
-      this.setState({ screen });
+      // Mobile: màn vẽ đường mở sẵn sheet; owner/viewer để map full, mở bằng nút icon.
+      this.setState({ screen, sheetOpen: screen === 'graph' });
       this._ensureChannel(token, screen === 'viewer' ? 'viewer' : 'owner', otoken);
       // fit view after image known
       this._scheduleFit();
@@ -1069,7 +1083,7 @@ class Component extends DCLogic {
   goHome(){ this._teardownChannel(); this._nav(''); }
   demoOpen(){ // quick demo: create a session with the sample map and jump to graph editor
     this.setState({ mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048, aerialChosen:true, nodes:[], edges:[], ownerPos:{xRatio:0.55,yRatio:0.46} });
-    this._createSession(60, null, ()=>{ this.setState({screen:'create', createTab:'graph'}); this._scheduleFit(); this._toast(this.L().demoReady); });
+    this._createSession(60, null, ()=>{ this.setState({screen:'create', createTab:'graph', sheetOpen:true}); this._scheduleFit(); this._toast(this.L().demoReady); });
   }
   chooseAerial(){ this.setState({ mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048, aerialChosen:true, createTab:'pos' }); this._scheduleFit(); }
   triggerUpload(){ if(this.fileRef.current) this.fileRef.current.click(); }
@@ -1242,10 +1256,14 @@ class Component extends DCLogic {
     const panelIsSheet = st.isMobile && showMap;
 
     let bodyLayout = "flex:1;min-height:0;display:flex;";
-    if(st.isMobile) bodyLayout += "flex-direction:column-reverse;"; // map on top, sheet below
+    if(st.isMobile) bodyLayout += "position:relative;"; // map chiếm toàn bộ, panel là sheet phủ lên
     let panelStyle;
     if(isHome || isError){ panelStyle = "flex:1;overflow-y:auto;"; }
-    else if(panelIsSheet){ panelStyle = "flex:none;height:42vh;background:#fff;border-top:1px solid #e2e8f0;box-shadow:0 -6px 20px rgba(15,23,42,.08);overflow:hidden;z-index:40;"; }
+    else if(panelIsSheet){
+      // Mobile: bảng điều khiển là bottom-sheet trượt lên, ẩn đi để map hiện full.
+      const base = "position:absolute;left:0;right:0;bottom:0;height:54vh;max-height:calc(100% - 12px);background:#fff;border-radius:22px 22px 0 0;box-shadow:0 -10px 34px rgba(15,23,42,.24);overflow:hidden;z-index:46;display:flex;flex-direction:column;padding-top:20px;transition:transform .3s cubic-bezier(.4,0,.2,1);will-change:transform;";
+      panelStyle = base + (st.sheetOpen ? "transform:translateY(0);" : "transform:translateY(112%);");
+    }
     else { panelStyle = "flex:none;width:360px;background:#fff;border-right:1px solid #e2e8f0;overflow:hidden;z-index:40;display:flex;flex-direction:column;"; }
 
     // ---- SVG views ----
@@ -1344,6 +1362,15 @@ class Component extends DCLogic {
       // screens
       isHome, isCreate, isGraph, isOwner, isViewer, isError, showMap,
       bodyLayoutStyle: bodyLayout, panelStyle,
+      // mobile: bottom-sheet điều khiển (map full, chức năng thu vào icon góc)
+      showSheetFab: panelIsSheet && !st.sheetOpen,
+      showSheetHandle: panelIsSheet,
+      openSheet:()=>this.setState({ sheetOpen:true }),
+      closeSheet:()=>this.setState({ sheetOpen:false }),
+      sheetFabLabel: roleNames[st.screen] || (st.lang==='vi'?'Bảng điều khiển':'Controls'),
+      sheetFabStyle:"position:absolute;top:14px;right:14px;z-index:30;display:inline-flex;align-items:center;gap:8px;padding:11px 15px;border-radius:999px;background:#dc2626;color:#fff;border:none;font-weight:700;font-size:.86rem;cursor:pointer;box-shadow:0 8px 22px rgba(220,38,38,.42);animation:fadeup .25s ease;",
+      sheetHandleStyle:"position:absolute;top:0;left:0;right:0;height:20px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;z-index:3;",
+      sheetGrabberStyle:"width:44px;height:5px;border-radius:3px;background:#cbd5e1;",
       // home
       homeFeatures: this._homeFeatures(),
       startCreate:()=>this.startCreate(), demoOpen:()=>this.demoOpen(), goHome:()=>this.goHome(),

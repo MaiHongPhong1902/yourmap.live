@@ -372,14 +372,22 @@ window.MSNet = (function () {
 
             <!-- pins layer -->
             <div style="position:absolute;inset:0;pointer-events:none;">
-              <!-- location labels (tên vị trí) -->
+              <!-- vùng đã đặt tên (co giãn theo bản đồ) -->
+              <sc-for list="{{ areaLabels }}" as="ar" hint-placeholder-count="0">
+                <div style="position:absolute;left:{{ ar.l }}%;top:{{ ar.t }}%;width:{{ ar.w }}%;height:{{ ar.h }}%;background:rgba(220,38,38,.12);border:2px solid rgba(220,38,38,.7);border-radius:6px;pointer-events:none;"></div>
+              </sc-for>
+              <!-- preview khi đang kéo khoanh vùng -->
+              <sc-if value="{{ regionDraftOn }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;left:{{ regionDraftL }}%;top:{{ regionDraftT }}%;width:{{ regionDraftW }}%;height:{{ regionDraftH }}%;background:rgba(220,38,38,.1);border:2px dashed rgba(220,38,38,.8);border-radius:6px;pointer-events:none;"></div>
+              </sc-if>
+              <!-- tên điểm / tên vùng (chip, giữ cỡ chữ theo zoom) -->
               <sc-for list="{{ labelsView }}" as="lb" hint-placeholder-count="0">
-                <div style="position:absolute;left:{{ lb.l }}%;top:{{ lb.t }}%;transform:translate(-50%,-140%) scale(calc(1/var(--z,1)));transform-origin:bottom center;pointer-events:none;">
+                <div style="position:absolute;left:{{ lb.l }}%;top:{{ lb.t }}%;transform:{{ lb.tf }};transform-origin:bottom center;pointer-events:none;">
                   <div style="display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:8px;background:rgba(15,23,42,.86);color:#fff;font-size:.72rem;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.35);max-width:180px;overflow:hidden;text-overflow:ellipsis;">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" stroke-width="2.4" style="flex:none;"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                     {{ lb.text }}
                   </div>
-                  <div style="width:2px;height:8px;background:rgba(15,23,42,.86);margin:0 auto;"></div>
+                  <sc-if value="{{ lb.stem }}" hint-placeholder-val="{{ true }}"><div style="width:2px;height:8px;background:rgba(15,23,42,.86);margin:0 auto;"></div></sc-if>
                 </div>
               </sc-for>
               <sc-if value="{{ hasOwnerPin }}" hint-placeholder-val="{{ false }}">
@@ -453,7 +461,7 @@ class Component extends DCLogic {
     this.state = {
       screen:'home', lang:'vi',
       mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048,
-      nodes:[], edges:[], labels:[],
+      nodes:[], edges:[], labels:[], regionDraft:null,
       tool:'pen', newBidir:true,
       connectFrom:null, selNode:null, selEdge:null, penLast:null,
       histIdx:0, histLen:1,
@@ -706,6 +714,14 @@ class Component extends DCLogic {
   _applyTransform(){ const w = this.worldRef.current; if(!w) return; w.style.transform = `translate(${this.tx}px,${this.ty}px) scale(${this.sc})`; w.style.setProperty('--z', this.sc); }
   _pointerDown(e){
     if(e.target.closest('[data-pin]') || e.target.tagName === 'circle') return; // handled by element
+    const st = this.state;
+    const editingGraph = st.screen === 'graph' || (st.screen === 'create' && st.createTab === 'graph');
+    // Công cụ "Đặt tên": kéo để khoanh vùng (tap sẽ đặt điểm khi thả).
+    if(editingGraph && st.tool === 'label'){
+      const r = this._ratio(e.clientX, e.clientY);
+      this.drag = { mode:'region', sx:r.xRatio, sy:r.yRatio, cx:r.xRatio, cy:r.yRatio, x:e.clientX, y:e.clientY, moved:false };
+      return;
+    }
     this.drag = { mode:'pan', x:e.clientX, y:e.clientY, ox:this.tx, oy:this.ty, moved:false };
   }
   _pointerMove(e){
@@ -716,6 +732,7 @@ class Component extends DCLogic {
     else if(d.mode === 'node'){ const r = this._ratio(e.clientX, e.clientY); this._updateNode(d.id, r); }
     else if(d.mode === 'owner'){ const r = this._ratio(e.clientX, e.clientY); this.setState({ ownerPos:r }); }
     else if(d.mode === 'viewer'){ const r = this._ratio(e.clientX, e.clientY); this.setState({ viewerPos:r }); }
+    else if(d.mode === 'region'){ const r = this._ratio(e.clientX, e.clientY); d.cx = r.xRatio; d.cy = r.yRatio; this.setState({ regionDraft:{ x:Math.min(d.sx,d.cx), y:Math.min(d.sy,d.cy), w:Math.abs(d.cx-d.sx), h:Math.abs(d.cy-d.sy) } }); }
   }
   _pointerUp(e){
     const d = this.drag; this.drag = null; if(!d) return;
@@ -723,6 +740,12 @@ class Component extends DCLogic {
     else if(d.mode === 'node' && d.moved){ this._applyGraph(this.state.nodes, this.state.edges); }
     else if(d.mode === 'owner' && d.moved){ this._saveOwner(); }
     else if(d.mode === 'viewer' && d.moved && this.state.route){ this._recomputeRoute(); }
+    else if(d.mode === 'region'){
+      const rect = { x:Math.min(d.sx,d.cx), y:Math.min(d.sy,d.cy), w:Math.abs(d.cx-d.sx), h:Math.abs(d.cy-d.sy) };
+      this.setState({ regionDraft:null });
+      if(d.moved && rect.w > 0.015 && rect.h > 0.015) this._addAreaLabel(rect); // kéo đủ lớn → vùng
+      else this._labelClick({ xRatio:d.sx, yRatio:d.sy }); // chỉ chạm → điểm
+    }
   }
   _onWheel(e){
     e.preventDefault();
@@ -810,13 +833,22 @@ class Component extends DCLogic {
     this.setState({ nodes, edges, selNode:null }, ()=>this._saveGraph());
   }
   /* ---------------- location labels (đặt tên vị trí) ---------------- */
+  _labelCenter(l){ return { x: l.wRatio ? l.xRatio + l.wRatio/2 : l.xRatio, y: l.hRatio ? l.yRatio + l.hRatio/2 : l.yRatio }; }
   _nearestLabel(r){
     let best=null, bd=Infinity;
     for(const l of (this.state.labels||[])){
-      const dx=(l.xRatio-r.xRatio)*1000, dy=(l.yRatio-r.yRatio)*1000, d=Math.hypot(dx,dy);
+      const c = this._labelCenter(l);
+      const dx=(c.x-r.xRatio)*1000, dy=(c.y-r.yRatio)*1000, d=Math.hypot(dx,dy);
       if(d<bd){ bd=d; best=l; }
     }
     return best ? { label:best, dist:bd } : null;
+  }
+  _addAreaLabel(rect){
+    const txt = (window.prompt(this.L().labelAreaPrompt, '') || '').trim();
+    if(!txt) return;
+    const id = 'r' + this._rid(4);
+    const labels = (this.state.labels||[]).concat([{ id, text:txt.slice(0,60), xRatio:rect.x, yRatio:rect.y, wRatio:rect.w, hRatio:rect.h }]);
+    this.setState({ labels }, ()=>{ this._saveGraph(); this._toast(this.L().labelAdded); });
   }
   _labelClick(r){
     const near = this._nearestLabel(r);
@@ -1258,7 +1290,7 @@ class Component extends DCLogic {
         stepPosDesc:'Nhấn lên bản đồ để đặt vị trí của bạn (chủ phiên). Kéo ghim để chỉnh chính xác.', clearMarker:'Xóa vị trí',
         expiry:'Thời gian hết hạn', setPassword:'Đặt mật khẩu cho phiên', passwordPh:'Nhập mật khẩu…', linkWarn:'Ai có đường link đều xem được phiên. Owner link chứa quyền quản trị — giữ bí mật.', generate:'Tạo đường link chia sẻ', created:'Đã tạo phiên!', viewerLink:'Link người xem', ownerLink:'Link chủ phiên', keepSecret:'giữ bí mật', keepSecretShort:'bí mật', openOwner:'Chủ phiên', openGraph:'Vẽ đường', openViewer:'Người xem', copy:'Sao chép', copied:'Đã sao chép!',
         graphTitle:'Vẽ bộ xương đường đi', graphTitleEn:'Road graph editor', toolNode:'Thêm điểm', toolConnect:'Nối đường', toolEdit:'Chọn / Kéo', toolLabel:'Đặt tên', toolDelete:'Xóa',
-        labelPrompt:'Nhập tên cho vị trí này:', labelEditPrompt:'Sửa tên vị trí (để trống để xóa):', labelHelp:'Nhấn lên bản đồ để đặt tên cho một vị trí. Nhấn lại nhãn để sửa hoặc xóa.', labelAdded:'Đã thêm tên vị trí', labelRemoved:'Đã xóa tên vị trí', oneWay:'Một chiều', twoWay:'Hai chiều', newEdgeDir:'Đường mới:', showHelp:'Nhấn ảnh để thêm điểm (node) — nhấn lên một đoạn đã có để chèn điểm vào giữa. Chuyển sang "Nối đường" rồi nhấn 2 điểm để tạo đoạn đường.', nodesEdges:'điểm · đoạn', clearAll:'Xóa tất cả', selectedEdge:'Đoạn đường đã chọn', weight:'Trọng số (khoảng cách)', blocked:'Chặn đoạn này', deleteEdge:'Xóa đoạn', graphCleared:'Đã xóa road graph', selectedNode:'Điểm đã chọn', deleteNode:'Xóa điểm', connectHint:'Đã chọn điểm đầu — nhấn điểm tiếp theo (hoặc nhấn lên đường) để nối. Nhấn lại điểm đó để dừng.', connectHelp:'Nhấn hai điểm để nối. Nhấn thẳng lên một đường có sẵn sẽ tự chèn điểm tại đó. Đường cắt nhau tự tạo điểm giao.', noSelection:'Chưa chọn đối tượng nào. Nhấn một điểm hoặc đoạn đường.',
+        labelPrompt:'Nhập tên cho điểm này:', labelAreaPrompt:'Nhập tên cho vùng này:', labelEditPrompt:'Sửa tên (để trống để xóa):', labelHelp:'Nhấn để đặt tên một điểm; kéo để khoanh và đặt tên một vùng. Nhấn lại nhãn để sửa/xóa.', labelAdded:'Đã thêm tên', labelRemoved:'Đã xóa tên', oneWay:'Một chiều', twoWay:'Hai chiều', newEdgeDir:'Đường mới:', showHelp:'Nhấn ảnh để thêm điểm (node) — nhấn lên một đoạn đã có để chèn điểm vào giữa. Chuyển sang "Nối đường" rồi nhấn 2 điểm để tạo đoạn đường.', nodesEdges:'điểm · đoạn', clearAll:'Xóa tất cả', selectedEdge:'Đoạn đường đã chọn', weight:'Trọng số (khoảng cách)', blocked:'Chặn đoạn này', deleteEdge:'Xóa đoạn', graphCleared:'Đã xóa road graph', selectedNode:'Điểm đã chọn', deleteNode:'Xóa điểm', connectHint:'Đã chọn điểm đầu — nhấn điểm tiếp theo (hoặc nhấn lên đường) để nối. Nhấn lại điểm đó để dừng.', connectHelp:'Nhấn hai điểm để nối. Nhấn thẳng lên một đường có sẵn sẽ tự chèn điểm tại đó. Đường cắt nhau tự tạo điểm giao.', noSelection:'Chưa chọn đối tượng nào. Nhấn một điểm hoặc đoạn đường.',
         ownerTitle:'Chủ phiên', ownerTitleEn:'Session owner', viewersOnline:'Người đang xem', timeLeft:'Còn lại', ownerSet:'Nhấn hoặc kéo để đặt vị trí của bạn.', ownerLockedLabel:'Vị trí đã khóa. Mở khóa để chỉnh.', lock:'Khóa vị trí', unlock:'Mở khóa để chỉnh', ownerHelp:'Vị trí của bạn được cập nhật theo thời gian thực cho mọi người đang mở cùng phiên.', endSession:'Kết thúc phiên', locked:'Đã khóa vị trí', sessionEnded:'Phiên đã kết thúc',
         viewerTitle:'Người xem', viewerTitleEn:'Viewer', sessActive:'Phiên đang hoạt động', sessExpiring:'Phiên sắp hết hạn', ownerReady:'Chủ phiên đã ghim vị trí', ownerWaiting:'Chủ phiên chưa đặt vị trí…', pick:'Chọn vị trí của tôi', picking:'Nhấn lên bản đồ…', useGps:'Dùng vị trí GPS', findRoute:'Chỉ đường', clearRoute:'Xóa đường đi', distance:'Khoảng cách ước tính', hops:'điểm trên tuyến', pickHint:'Nhấn lên bản đồ để đặt điểm bắt đầu.',
         errNoOwner:'Chủ phiên chưa đặt vị trí.', errNoViewer:'Hãy chọn vị trí bắt đầu của bạn trước.', errNoGraph:'Bản đồ chưa có đủ đường đi (cần ít nhất 2 điểm).', errNoPath:'Không tìm được đường nối giữa hai điểm.', needOwnerPos:'Hãy đặt vị trí chủ phiên trước.', viewerOpened:'Đã mở tab người xem', demoReady:'Demo sẵn sàng — hãy vẽ đường & mở link người xem', pickHint2:'', nodeOnEdge:'Đã chèn điểm vào đoạn đường có sẵn', undo:'Hoàn tác', redo:'Làm lại', toolPen:'Bút vẽ đường', penHint:'Vẽ đường liền mạch bằng cách nhấn nối tiếp', penOn:'Đang bật — nhấn để tắt', penHelp:'Nhấn lên bản đồ để bắt đầu vẽ. Mỗi lần nhấn thêm một điểm và tự nối với điểm trước.', penContinue:'Nhấn tiếp để kéo dài đường · nhấn lại điểm cuối (hoặc Esc) để kết thúc nét.', saveMap:'Lưu bản đồ', loadMap:'Tải bản đồ', mapSaved:'Đã lưu bản đồ ra file JSON', mapLoaded:'Đã tải bản đồ từ file', badFile:'File không hợp lệ', copyFail:'Link đã được bôi chọn — nhấn Ctrl/Cmd+C để sao chép', storageFull:'Ảnh quá lớn để đồng bộ giữa các tab.', gpsUnavailable:'Ảnh bản đồ chưa được georeference nên GPS không khả dụng — hãy chọn thủ công.',
@@ -1271,7 +1303,7 @@ class Component extends DCLogic {
         stepPosDesc:'Click the map to set your position (owner). Drag the pin to fine-tune.', clearMarker:'Clear marker',
         expiry:'Expiry', setPassword:'Set a session password', passwordPh:'Enter password…', linkWarn:'Anyone with the link can view. The owner link grants admin rights — keep it secret.', generate:'Create share link', created:'Session created!', viewerLink:'Viewer link', ownerLink:'Owner link', keepSecret:'keep secret', keepSecretShort:'secret', openOwner:'Owner', openGraph:'Roads', openViewer:'Viewer', copy:'Copy', copied:'Copied!',
         graphTitle:'Draw the road graph', graphTitleEn:'Bộ xương đường đi', toolNode:'Add node', toolConnect:'Connect', toolEdit:'Select / Move', toolLabel:'Label', toolDelete:'Delete',
-        labelPrompt:'Enter a name for this spot:', labelEditPrompt:'Edit name (leave empty to delete):', labelHelp:'Tap the map to name a spot. Tap a label again to edit or remove it.', labelAdded:'Location label added', labelRemoved:'Location label removed', oneWay:'One-way', twoWay:'Two-way', newEdgeDir:'New edge:', showHelp:'Click the map to add nodes — click an existing edge to insert a node onto it. Switch to "Connect" and click two nodes to make a road.', nodesEdges:'nodes · edges', clearAll:'Clear all', selectedEdge:'Selected edge', weight:'Weight (distance)', blocked:'Block this edge', deleteEdge:'Delete edge', graphCleared:'Road graph cleared', selectedNode:'Selected node', deleteNode:'Delete node', connectHint:'First node chosen — click the next node (or a road) to connect. Click it again to stop.', connectHelp:'Click two nodes to connect. Click directly on an existing road to insert a point there. Crossing roads auto-create an intersection node.', noSelection:'Nothing selected. Click a node or edge.',
+        labelPrompt:'Enter a name for this point:', labelAreaPrompt:'Enter a name for this area:', labelEditPrompt:'Edit name (leave empty to delete):', labelHelp:'Tap to name a point; drag to outline and name an area. Tap a label again to edit or remove it.', labelAdded:'Label added', labelRemoved:'Label removed', oneWay:'One-way', twoWay:'Two-way', newEdgeDir:'New edge:', showHelp:'Click the map to add nodes — click an existing edge to insert a node onto it. Switch to "Connect" and click two nodes to make a road.', nodesEdges:'nodes · edges', clearAll:'Clear all', selectedEdge:'Selected edge', weight:'Weight (distance)', blocked:'Block this edge', deleteEdge:'Delete edge', graphCleared:'Road graph cleared', selectedNode:'Selected node', deleteNode:'Delete node', connectHint:'First node chosen — click the next node (or a road) to connect. Click it again to stop.', connectHelp:'Click two nodes to connect. Click directly on an existing road to insert a point there. Crossing roads auto-create an intersection node.', noSelection:'Nothing selected. Click a node or edge.',
         ownerTitle:'Session owner', ownerTitleEn:'Chủ phiên', viewersOnline:'Viewers online', timeLeft:'Time left', ownerSet:'Click or drag to set your position.', ownerLockedLabel:'Position locked. Unlock to edit.', lock:'Lock position', unlock:'Unlock to edit', ownerHelp:'Your position updates in real time for everyone in this session.', endSession:'End session', locked:'Position locked', sessionEnded:'Session ended',
         viewerTitle:'Viewer', viewerTitleEn:'Người xem', sessActive:'Session active', sessExpiring:'Session expiring soon', ownerReady:'Owner pinned a location', ownerWaiting:'Owner has not set a position yet…', pick:'Choose my location', picking:'Click the map…', useGps:'Use GPS location', findRoute:'Get directions', clearRoute:'Clear route', distance:'Estimated distance', hops:'points on route', pickHint:'Click the map to set your start point.',
         errNoOwner:'Owner has not set a position.', errNoViewer:'Choose your start location first.', errNoGraph:'The map needs at least 2 connected nodes.', errNoPath:'No route found between the two points.', needOwnerPos:'Set the owner position first.', viewerOpened:'Viewer tab opened', demoReady:'Demo ready — draw roads & open the viewer link', pickHint2:'', nodeOnEdge:'Node inserted onto the existing edge', undo:'Undo', redo:'Redo', toolPen:'Pen (draw roads)', penHint:'Draw continuous roads by clicking', penOn:'Active — click to turn off', penHelp:'Click the map to start drawing. Each click adds a node and links it to the previous one.', penContinue:'Keep clicking to extend the road · click the last point (or Esc) to finish.', saveMap:'Save map', loadMap:'Load map', mapSaved:'Map saved to a JSON file', mapLoaded:'Map loaded from file', badFile:'Invalid file', copyFail:'Link selected — press Ctrl/Cmd+C to copy', storageFull:'Image too large to sync across tabs.', gpsUnavailable:'Map is not georeferenced, GPS unavailable — pick manually.',
@@ -1471,12 +1503,16 @@ class Component extends DCLogic {
       mapImage:st.mapImage, imgRef:this.imgRef, viewBox:`0 0 1000 ${Math.round(vbH)}`, worldW: st.isMobile?520:760, worldAspect:`${st.mapW} / ${st.mapH}`,
       vpRef:this.vpRef, worldRef:this.worldRef, svgRef:this.svgRef, onImgLoad:()=>this._scheduleFit(),
       edgesView, nodesView, searchView, connectorsView, routePts, hasRoute,
-      labelsView: (st.labels||[]).map(l=>({ id:l.id, text:l.text, l:l.xRatio*100, t:l.yRatio*100 })),
+      labelsView: (st.labels||[]).map(l=>{ const area=!!l.wRatio; const cx=area?l.xRatio+l.wRatio/2:l.xRatio, cy=area?l.yRatio+l.hRatio/2:l.yRatio; return { id:l.id, text:l.text, l:cx*100, t:cy*100, stem:!area, tf: area?'translate(-50%,-50%) scale(calc(1/var(--z,1)))':'translate(-50%,-140%) scale(calc(1/var(--z,1)))' }; }),
+      areaLabels: (st.labels||[]).filter(l=>l.wRatio).map(l=>({ id:l.id, l:l.xRatio*100, t:l.yRatio*100, w:l.wRatio*100, h:l.hRatio*100 })),
+      regionDraftOn: !!st.regionDraft,
+      regionDraftL: st.regionDraft?st.regionDraft.x*100:0, regionDraftT: st.regionDraft?st.regionDraft.y*100:0,
+      regionDraftW: st.regionDraft?st.regionDraft.w*100:0, regionDraftH: st.regionDraft?st.regionDraft.h*100:0,
       hasOwnerPin, ownerPinL: st.ownerPos?st.ownerPos.xRatio*100:0, ownerPinT: st.ownerPos?st.ownerPos.yRatio*100:0,
       ownerPinCursor: ownerPinDrag?'grab':'default', ownerPinLive: st.ownerLive, onOwnerPinDown:(e)=>{ if(!ownerPinDrag) return; e.stopPropagation(); this.drag={mode:'owner',moved:false,x:e.clientX,y:e.clientY}; },
       hasViewerPin, viewerPinL: st.viewerPos?st.viewerPos.xRatio*100:0, viewerPinT: st.viewerPos?st.viewerPos.yRatio*100:0,
       viewerPinCursor: isViewer?'grab':'default', onViewerPinDown:(e)=>{ if(!isViewer) return; e.stopPropagation(); this.drag={mode:'viewer',moved:false,x:e.clientX,y:e.clientY}; },
-      stageCursor: (editingGraph&&(st.tool==='node'||st.tool==='pen'))||ownerPinDrag||(isViewer&&st.picking) ? 'crosshair' : 'grab',
+      stageCursor: (editingGraph&&(st.tool==='node'||st.tool==='pen'||st.tool==='label'))||ownerPinDrag||(isViewer&&st.picking) ? 'crosshair' : 'grab',
       zoomIn:()=>this.zoomIn(), zoomOut:()=>this.zoomOut(), zoomReset:()=>this.zoomReset(), zoomBtnStyle:zoomBtn,
       instructionLabel:instruction,
       // toast

@@ -417,10 +417,62 @@ window.MSNet = (function () {
         </div>
 
         <!-- legend / instruction chip -->
-        <div style="position:absolute;left:14px;bottom:14px;display:flex;gap:8px;align-items:center;padding:8px 13px;border-radius:10px;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);border:1px solid #e2e8f0;box-shadow:0 4px 14px rgba(15,23,42,.1);font-size:.8rem;font-weight:600;color:#475569;z-index:20;max-width:calc(100% - 90px);">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.2" style="flex:none;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-          <span>{{ instructionLabel }}</span>
-        </div>
+        <sc-if value="{{ showInstruction }}" hint-placeholder-val="{{ true }}">
+          <div style="position:absolute;left:14px;bottom:14px;display:flex;gap:8px;align-items:center;padding:8px 13px;border-radius:10px;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);border:1px solid #e2e8f0;box-shadow:0 4px 14px rgba(15,23,42,.1);font-size:.8rem;font-weight:600;color:#475569;z-index:20;max-width:calc(100% - 90px);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.2" style="flex:none;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span>{{ instructionLabel }}</span>
+          </div>
+        </sc-if>
+
+        <!-- mobile viewer: chip khoảng cách -->
+        <sc-if value="{{ showViewerInfo }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:50%;top:14px;transform:translateX(-50%);display:flex;gap:8px;align-items:center;padding:8px 15px;border-radius:999px;background:rgba(15,23,42,.9);color:#fff;font-size:.82rem;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.3);z-index:25;white-space:nowrap;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" stroke-width="2.4" style="flex:none;"><polyline points="9 18 15 12 9 6"/><path d="M15 12H3"/></svg>
+            <span>{{ distanceLabel }} · {{ routeHopsLabel }}</span>
+          </div>
+        </sc-if>
+        <!-- mobile owner: chip người xem + đếm ngược -->
+        <sc-if value="{{ showOwnerInfo }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:50%;top:14px;transform:translateX(-50%);display:flex;gap:12px;align-items:center;padding:8px 16px;border-radius:999px;background:rgba(15,23,42,.9);color:#fff;font-size:.82rem;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.3);z-index:25;white-space:nowrap;">
+            <span style="display:inline-flex;align-items:center;gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2.4"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>{{ viewerCount }}</span>
+            <span style="display:inline-flex;align-items:center;gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>{{ countdownLabel }}</span>
+          </div>
+        </sc-if>
+
+        <!-- mobile viewer: nút hành động nổi trên map -->
+        <sc-if value="{{ mapActViewer }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 24px);z-index:25;">
+            <button onClick="{{ startPickViewer }}" style="display:inline-flex;align-items:center;gap:7px;padding:12px 17px;border-radius:999px;border:none;background:#2563eb;color:#fff;font-weight:700;font-size:.86rem;cursor:pointer;box-shadow:0 7px 20px rgba(37,99,235,.4);">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.3"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>{{ pickBtnLabel }}
+            </button>
+            <button onClick="{{ findRoute }}" style="display:inline-flex;align-items:center;gap:7px;padding:12px 17px;border-radius:999px;border:none;background:#dc2626;color:#fff;font-weight:700;font-size:.86rem;cursor:pointer;box-shadow:0 7px 20px rgba(220,38,38,.42);">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/><path d="M15 12H3"/></svg>{{ s.findRoute }}
+            </button>
+            <sc-if value="{{ hasRoute }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ clearRoute }}" style="display:inline-flex;align-items:center;gap:6px;padding:12px 16px;border-radius:999px;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font-weight:700;font-size:.86rem;cursor:pointer;box-shadow:0 6px 18px rgba(15,23,42,.18);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>{{ s.clearRoute }}
+              </button>
+            </sc-if>
+          </div>
+        </sc-if>
+        <!-- mobile owner: nút hành động nổi trên map -->
+        <sc-if value="{{ mapActOwner }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 24px);z-index:25;">
+            <sc-if value="{{ ownerUnlocked }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ lockOwner }}" style="display:inline-flex;align-items:center;gap:7px;padding:12px 17px;border-radius:999px;border:none;background:#dc2626;color:#fff;font-weight:700;font-size:.86rem;cursor:pointer;box-shadow:0 7px 20px rgba(220,38,38,.42);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.3"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>{{ s.lock }}
+              </button>
+            </sc-if>
+            <sc-if value="{{ ownerLocked }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ unlockOwner }}" style="display:inline-flex;align-items:center;gap:7px;padding:12px 17px;border-radius:999px;border:1.5px solid #e2e8f0;background:#fff;color:#0f172a;font-weight:700;font-size:.86rem;cursor:pointer;box-shadow:0 6px 18px rgba(15,23,42,.18);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>{{ s.unlock }}
+              </button>
+            </sc-if>
+            <button onClick="{{ endSession }}" style="display:inline-flex;align-items:center;gap:6px;padding:12px 16px;border-radius:999px;border:1.5px solid #fecaca;background:#fff;color:#dc2626;font-weight:700;font-size:.86rem;cursor:pointer;box-shadow:0 6px 18px rgba(15,23,42,.18);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>{{ s.endSession }}
+            </button>
+          </div>
+        </sc-if>
       </div>
     </sc-if>
 
@@ -1172,12 +1224,12 @@ class Component extends DCLogic {
   findRoute(){
     const L = this.L();
     const st = this.state;
-    if(!st.ownerPos){ this.setState({ routeError:L.errNoOwner }); return; }
-    if(!st.viewerPos){ this.setState({ routeError:L.errNoViewer, picking:true }); this._toast(L.errNoViewer); return; }
-    if(st.nodes.length < 2){ this.setState({ routeError:L.errNoGraph }); return; }
+    if(!st.ownerPos){ this.setState({ routeError:L.errNoOwner }); this._toast(L.errNoOwner); return; }
+    if(!st.viewerPos){ this.setState({ routeError:L.errNoViewer, picking:true, sheetOpen:false }); this._toast(L.errNoViewer); return; }
+    if(st.nodes.length < 2){ this.setState({ routeError:L.errNoGraph }); this._toast(L.errNoGraph); return; }
     const sNear = this._nearestNode(st.viewerPos);
     const gNear = this._nearestNode(st.ownerPos);
-    if(!sNear || !gNear){ this.setState({ routeError:L.errNoGraph }); return; }
+    if(!sNear || !gNear){ this.setState({ routeError:L.errNoGraph }); this._toast(L.errNoGraph); return; }
     const res = this._astar(sNear.node.id, gNear.node.id);
     if(!res){ this.setState({ route:null, routeError:L.errNoPath, searchSegs:[] }); this._toast(L.errNoPath); return; }
     // animate the search frontier, then reveal the route
@@ -1484,11 +1536,18 @@ class Component extends DCLogic {
       // screens
       isHome, isCreate, isGraph, isOwner, isViewer, isError, showMap,
       bodyLayoutStyle: bodyLayout, panelStyle,
-      // mobile: bottom-sheet điều khiển (map full, chức năng thu vào icon góc)
-      showSheetFab: panelIsSheet && !st.sheetOpen,
-      showSheetHandle: panelIsSheet,
+      // mobile: create/graph vẫn dùng bottom-sheet (biểu mẫu/bộ công cụ nhiều mục);
+      // viewer/owner dùng nút hành động nổi trực tiếp trên bản đồ.
+      showSheetFab: panelIsSheet && !st.sheetOpen && (isCreate || isGraph),
+      showSheetHandle: panelIsSheet && (isCreate || isGraph),
       openSheet:()=>this.setState({ sheetOpen:true }),
       closeSheet:()=>this.setState({ sheetOpen:false }),
+      // nút hành động nổi trên map (mobile, viewer/owner)
+      mapActViewer: st.isMobile && isViewer,
+      mapActOwner: st.isMobile && isOwner,
+      showInstruction: !st.isMobile || !(isViewer || isOwner) || ownerPinDrag || (isViewer && st.picking),
+      showViewerInfo: st.isMobile && isViewer && hasRoute,
+      showOwnerInfo: st.isMobile && isOwner,
       sheetFabLabel: roleNames[st.screen] || (st.lang==='vi'?'Bảng điều khiển':'Controls'),
       sheetFabStyle:"position:absolute;top:14px;right:14px;z-index:30;display:inline-flex;align-items:center;gap:8px;padding:11px 15px;border-radius:999px;background:#dc2626;color:#fff;border:none;font-weight:700;font-size:.86rem;cursor:pointer;box-shadow:0 8px 22px rgba(220,38,38,.42);animation:fadeup .25s ease;",
       sheetHandleStyle:"position:absolute;top:0;left:0;right:0;height:20px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;z-index:3;",

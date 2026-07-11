@@ -19,8 +19,10 @@ window.MSNet = (function () {
   function api(p) { return '/api' + p; }
   return {
     enabled: enabled,
-    get: function (token) {
-      return fetch(api('/sessions/' + encodeURIComponent(token))).then(function (r) {
+    get: function (token, ot) {
+      var p = '/sessions/' + encodeURIComponent(token);
+      if (ot) p += '?ot=' + encodeURIComponent(ot);
+      return fetch(api(p)).then(function (r) {
         if (r.status === 404) return null;
         if (!r.ok) throw new Error('http ' + r.status);
         return r.json();
@@ -718,7 +720,7 @@ class Component extends DCLogic {
         if(window.MSNet && window.MSNet.enabled && !(this._remoteTried && this._remoteTried[token])){
           (this._remoteTried = this._remoteTried || {})[token] = true;
           this.setState({ screen:'loading' });
-          this._fetchRemote(token);
+          this._fetchRemote(token, 0, seg[3]);
           return;
         }
         this.setState({ screen:'notfound' }); return;
@@ -727,7 +729,8 @@ class Component extends DCLogic {
       if(sess.expiresAt && Date.now() > sess.expiresAt){ this.setState({ screen:'expired' }); return; }
       const role = seg[2]; // owner | graph | undefined(viewer)
       const otoken = seg[3];
-      const isOwner = (role === 'owner' || role === 'graph') && otoken && this._hash(otoken) === sess.ownerTokenHash;
+      const isOwner = (role === 'owner' || role === 'graph') && otoken &&
+        (sess.isOwner === true || this._hash(otoken) === sess.ownerTokenHash);
       if((role === 'owner' || role === 'graph') && !isOwner){ this.setState({ screen:'denied' }); return; }
       this._applySession(token, sess, otoken);
       const screen = role === 'graph' ? 'graph' : role === 'owner' ? 'owner' : 'viewer';
@@ -882,15 +885,15 @@ class Component extends DCLogic {
   }
 
   /* ---------------- nạp session từ server ---------------- */
-  _fetchRemote(token, attempt){
+  _fetchRemote(token, attempt, ot){
     attempt = attempt || 0;
     const retryOrFail = ()=>{
       // Thử lại vài lần: người xem có thể mở link ngay khi POST tạo phiên chưa kịp lưu.
       if(attempt < 6 && this._remoteTried && this._remoteTried[token]){
-        this._fetchTimer = setTimeout(()=>this._fetchRemote(token, attempt+1), 700);
+        this._fetchTimer = setTimeout(()=>this._fetchRemote(token, attempt+1, ot), 700);
       } else { this.setState({ screen:'notfound' }); }
     };
-    window.MSNet.get(token).then((sess)=>{
+    window.MSNet.get(token, ot).then((sess)=>{
       if(sess && sess.token){
         try{ localStorage.setItem(this._key(token), JSON.stringify(sess)); }catch(e){}
         this.route();
@@ -946,7 +949,7 @@ class Component extends DCLogic {
     if(this.ws && this.ws.readyState === 1){ try{ this.ws.send(JSON.stringify(msg)); }catch(e){} }
   }
   _recv(msg){
-    if(!msg || msg.peerId === this.peerId && msg.type!=='owner' && msg.type!=='graph') { /* still process own? no */ }
+    if(!msg || typeof msg.type !== 'string') return; // bỏ qua message rỗng/không hợp lệ
     if(msg.type === 'ping'){ this.peers[msg.peerId] = { role: msg.role, ts: Date.now() }; if(msg.peerId!==this.peerId) this._send({type:'pong', peerId:this.peerId, role:this._myRole}); this._recount(); }
     else if(msg.type === 'pong'){ this.peers[msg.peerId] = { role: msg.role, ts: Date.now() }; this._recount(); }
     else if(msg.type === 'bye'){ delete this.peers[msg.peerId]; this._recount(); }

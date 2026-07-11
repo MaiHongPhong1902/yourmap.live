@@ -1,0 +1,11 @@
+# Chuẩn hóa line-ending để chạy đúng trên server Linux.
+* text=auto eol=lf
+
+# Script Windows giữ CRLF.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# File nhị phân.
+*.jpg binary
+*.png binary
+*.webp binary

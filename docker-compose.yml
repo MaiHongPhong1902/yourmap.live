@@ -1,0 +1,18 @@
+services:
+  mapshare:
+    build: .
+    container_name: mapshare
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+      - DATA_DIR=/data
+      - UPLOAD_DIR=/data/uploads
+      - MAX_UPLOAD_MB=10
+    volumes:
+      - mapshare-data:/data
+    restart: unless-stopped
+
+volumes:
+  mapshare-data:

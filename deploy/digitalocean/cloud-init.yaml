@@ -1,0 +1,56 @@
+#cloud-config
+# Cloud-init tự động dựng Map-Share khi droplet khởi động lần đầu.
+# Dùng làm --user-data-file khi tạo droplet (xem create-droplet.sh).
+
+package_update: true
+package_upgrade: false
+packages:
+  - git
+  - nginx
+  - ca-certificates
+  - curl
+
+write_files:
+  # Đặt sẵn config nginx để runcmd chỉ việc bật.
+  - path: /etc/nginx/sites-available/mapshare
+    content: |
+      server {
+          listen 80 default_server;
+          listen [::]:80 default_server;
+          server_name _;
+
+          # Cho phép body lớn (ảnh bản đồ / data URL fallback).
+          client_max_body_size 16M;
+
+          location / {
+              proxy_pass http://127.0.0.1:3000;
+              proxy_http_version 1.1;
+              # Hỗ trợ nâng cấp WebSocket (đồng bộ realtime /ws).
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "upgrade";
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_read_timeout 3600s;
+              proxy_send_timeout 3600s;
+          }
+      }
+
+runcmd:
+  # Cài Node.js 20 LTS.
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  - apt-get install -y nodejs
+  # Lấy mã nguồn.
+  - git clone https://github.com/MaiHongPhong1902/yourmap.live.git /opt/mapshare
+  - cd /opt/mapshare && npm install --omit=dev
+  # Dịch vụ systemd.
+  - cp /opt/mapshare/deploy/mapshare.service /etc/systemd/system/mapshare.service
+  - systemctl daemon-reload
+  - systemctl enable --now mapshare
+  # Reverse proxy nginx.
+  - ln -sf /etc/nginx/sites-available/mapshare /etc/nginx/sites-enabled/mapshare
+  - rm -f /etc/nginx/sites-enabled/default
+  - nginx -t && systemctl restart nginx
+
+final_message: "Map-Share đã sẵn sàng sau $UPTIME giây. Mở http://<IP-droplet>/"

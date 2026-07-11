@@ -1,0 +1,19 @@
+{
+  "name": "map-share-backend",
+  "version": "1.0.0",
+  "description": "Backend (REST + WebSocket) cho ứng dụng Chia sẻ vị trí bản đồ. Chạy cross-platform Linux/Windows.",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "multer": "^2.0.1",
+    "ws": "^8.18.0"
+  }
+}

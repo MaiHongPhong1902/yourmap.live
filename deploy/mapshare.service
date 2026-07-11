@@ -1,0 +1,33 @@
+# systemd unit cho Map-Share backend (Linux).
+#
+# Cài đặt:
+#   sudo cp -r "Ứng dụng chia sẻ vị trí bản đồ" /opt/mapshare
+#   cd /opt/mapshare && npm install --omit=dev
+#   sudo cp deploy/mapshare.service /etc/systemd/system/mapshare.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now mapshare
+#   sudo systemctl status mapshare
+#
+# Xem log:  journalctl -u mapshare -f
+
+[Unit]
+Description=Map Share backend (chia sẻ vị trí bản đồ)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/mapshare
+ExecStart=/usr/bin/node /opt/mapshare/server.js
+Environment=PORT=3000
+Environment=HOST=0.0.0.0
+Environment=DATA_DIR=/opt/mapshare/data
+Environment=UPLOAD_DIR=/opt/mapshare/uploads
+Restart=on-failure
+RestartSec=5
+# Chạy dưới user ít quyền (tạo trước: sudo useradd -r -s /usr/sbin/nologin mapshare
+# và chown -R mapshare:mapshare /opt/mapshare). Bỏ comment nếu muốn:
+#User=mapshare
+#Group=mapshare
+
+[Install]
+WantedBy=multi-user.target

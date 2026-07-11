@@ -27,6 +27,8 @@ const { WebSocketServer } = require('ws');
 
 const { SessionStore } = require('./lib/store');
 const { cyrb53 } = require('./lib/hash');
+const { Auth, TOKEN_TTL_MS } = require('./lib/auth');
+const { UserStore } = require('./lib/users');
 
 // ----------------------------------------------------------------------------
 // Cấu hình
@@ -46,6 +48,9 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const store = new SessionStore(DATA_DIR);
+const users = new UserStore(DATA_DIR);
+const auth = new Auth(DATA_DIR);
+const AUTH_COOKIE = 'ms_auth';
 
 // ----------------------------------------------------------------------------
 // Tiện ích
@@ -63,6 +68,9 @@ function sanitizeIncomingSession(body) {
   return {
     token,
     ownerTokenHash: String(body.ownerTokenHash),
+    // ownerToken gốc lưu để chủ sở hữu (đã đăng nhập) mở lại link owner từ dashboard.
+    // KHÔNG bao giờ trả trong GET công khai.
+    ownerToken: typeof body.ownerToken === 'string' ? body.ownerToken : null,
     mapImage: typeof body.mapImage === 'string' ? body.mapImage : null,
     mapW: Number(body.mapW) || 0,
     mapH: Number(body.mapH) || 0,
@@ -76,14 +84,66 @@ function sanitizeIncomingSession(body) {
     hasPassword: !!body.hasPassword,
     passwordHash: body.passwordHash ? String(body.passwordHash) : null,
     status: body.status === 'ended' ? 'ended' : 'active',
+    name: typeof body.name === 'string' ? body.name.slice(0, 80) : '',
   };
 }
+
+/** Số người xem đang kết nối realtime cho một token (socket không phải owner). */
+function viewerCountOf(token) {
+  const set = rooms.get(token);
+  if (!set) return 0;
+  let n = 0;
+  for (const ws of set) if (!ws.isOwner && ws.readyState === ws.OPEN) n++;
+  return n;
+}
+
+// ---- cookie / auth helpers ----
+function parseCookies(req) {
+  const out = {};
+  const raw = req.headers.cookie;
+  if (!raw) return out;
+  for (const part of raw.split(';')) {
+    const i = part.indexOf('=');
+    if (i < 0) continue;
+    out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+  }
+  return out;
+}
+
+function isHttps(req) {
+  return req.secure || req.get('x-forwarded-proto') === 'https';
+}
+
+function setAuthCookie(req, res, token) {
+  const parts = [
+    AUTH_COOKIE + '=' + encodeURIComponent(token),
+    'Path=/', 'HttpOnly', 'SameSite=Lax',
+    'Max-Age=' + Math.floor(TOKEN_TTL_MS / 1000),
+  ];
+  if (isHttps(req)) parts.push('Secure');
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
+
+function clearAuthCookie(req, res) {
+  res.setHeader('Set-Cookie', AUTH_COOKIE + '=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+}
+
+/** Trả về user hiện tại (từ cookie) hoặc null. */
+function currentUser(req) {
+  const token = parseCookies(req)[AUTH_COOKIE];
+  const uid = auth.verify(token, Date.now());
+  if (!uid) return null;
+  return users.getById(uid);
+}
+
+function publicUser(u) { return u ? { id: u.id, username: u.username } : null; }
 
 // ----------------------------------------------------------------------------
 // Express app
 // ----------------------------------------------------------------------------
 const app = express();
 app.disable('x-powered-by');
+app.set('trust proxy', true); // sau nginx: đọc đúng X-Forwarded-Proto
 app.use(express.json({ limit: '16mb' })); // đủ chỗ cho mapImage dạng data URL (fallback)
 
 // Upload ảnh bản đồ ------------------------------------------------------------
@@ -111,11 +171,105 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, service: 'map-share', time: Date.now() });
 });
 
+// --- Auth ---------------------------------------------------------------------
+function validCreds(b) {
+  const username = (b && typeof b.username === 'string') ? b.username.trim() : '';
+  const password = (b && typeof b.password === 'string') ? b.password : '';
+  if (username.length < 3 || username.length > 40) return null;
+  if (password.length < 6 || password.length > 200) return null;
+  return { username, password };
+}
+
+app.post('/api/auth/register', (req, res) => {
+  const c = validCreds(req.body);
+  if (!c) return res.status(400).json({ error: 'Tên đăng nhập ≥ 3 ký tự và mật khẩu ≥ 6 ký tự.' });
+  if (users.findByName(c.username)) return res.status(409).json({ error: 'Tên đăng nhập đã tồn tại.' });
+  const user = users.create(c.username, auth.hashPassword(c.password));
+  setAuthCookie(req, res, auth.sign(user.id, Date.now()));
+  res.status(201).json({ user: publicUser(user) });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const c = validCreds(req.body);
+  if (!c) return res.status(400).json({ error: 'Thông tin đăng nhập không hợp lệ.' });
+  const user = users.findByName(c.username);
+  if (!user || !auth.verifyPassword(c.password, user.passHash)) {
+    return res.status(401).json({ error: 'Sai tên đăng nhập hoặc mật khẩu.' });
+  }
+  setAuthCookie(req, res, auth.sign(user.id, Date.now()));
+  res.json({ user: publicUser(user) });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  clearAuthCookie(req, res);
+  res.json({ ok: true });
+});
+
+app.get('/api/auth/me', (req, res) => {
+  res.json({ user: publicUser(currentUser(req)) });
+});
+
+// --- Quản lý phiên của người dùng (cần đăng nhập) -----------------------------
+app.get('/api/my/sessions', (req, res) => {
+  const u = currentUser(req);
+  if (!u) return res.status(401).json({ error: 'unauthorized' });
+  const list = store.list()
+    .filter((s) => s.ownerUserId === u.id)
+    .map((s) => ({
+      token: s.token,
+      name: s.name || '',
+      createdAt: s.createdAt || 0,
+      expiresAt: s.expiresAt || null,
+      status: s.status || 'active',
+      expired: !!(s.expiresAt && Date.now() > s.expiresAt),
+      nodes: (s.nodes || []).length,
+      viewers: viewerCountOf(s.token),
+      ownerToken: s.ownerToken || null, // chỉ trả cho chủ sở hữu (route này đã xác thực)
+    }))
+    .sort((a, b) => b.createdAt - a.createdAt);
+  res.json({ sessions: list });
+});
+
+app.patch('/api/sessions/:token/manage', (req, res) => {
+  const u = currentUser(req);
+  if (!u) return res.status(401).json({ error: 'unauthorized' });
+  const sess = store.get(req.params.token);
+  if (!sess) return res.status(404).json({ error: 'not found' });
+  if (sess.ownerUserId !== u.id) return res.status(403).json({ error: 'forbidden' });
+  const patch = {};
+  if (typeof req.body.name === 'string') patch.name = req.body.name.slice(0, 80);
+  if (req.body.status === 'ended') patch.status = 'ended';
+  const next = store.patch(req.params.token, patch);
+  if (patch.status === 'ended') broadcast(req.params.token, { type: 'end' }, null);
+  res.json({ ok: true, name: next.name, status: next.status });
+});
+
+app.delete('/api/sessions/:token', (req, res) => {
+  const u = currentUser(req);
+  const sess = store.get(req.params.token);
+  if (!sess) return res.status(404).json({ error: 'not found' });
+  const isOwnerUser = u && sess.ownerUserId === u.id;
+  const isOwnerTok = isOwnerToken(sess, req.get('x-owner-token'));
+  if (!isOwnerUser && !isOwnerTok) return res.status(403).json({ error: 'forbidden' });
+  broadcast(req.params.token, { type: 'end' }, null);
+  store.delete(req.params.token);
+  res.json({ ok: true });
+});
+
 // Tạo session (client sinh token + ownerToken để giữ nguyên cơ chế link).
 app.post('/api/sessions', (req, res) => {
+  const u = currentUser(req);
+  if (!u) return res.status(401).json({ error: 'Bạn cần đăng nhập để tạo phiên.' });
   const sess = sanitizeIncomingSession(req.body);
   if (!sess) return res.status(400).json({ error: 'invalid session payload' });
-  const existed = !!store.get(sess.token);
+  const prev = store.get(sess.token);
+  const existed = !!prev;
+  // Chủ sở hữu gán từ tài khoản đăng nhập (không tin body). Không cho chiếm phiên của người khác.
+  if (existed && prev.ownerUserId && prev.ownerUserId !== u.id) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  sess.ownerUserId = u.id;
+  if (existed && prev.name && !sess.name) sess.name = prev.name; // giữ tên đã đặt
   store.put(sess.token, sess);
   // Nếu là cập nhật (chủ phiên chỉnh sửa lại ở màn tạo phiên), phát realtime
   // cho người xem đang kết nối để họ thấy ngay đồ thị / vị trí mới nhất.
@@ -131,7 +285,9 @@ app.post('/api/sessions', (req, res) => {
 app.get('/api/sessions/:token', (req, res) => {
   const sess = store.get(req.params.token);
   if (!sess) return res.status(404).json({ error: 'not found' });
-  res.json(sess);
+  const pub = Object.assign({}, sess);
+  delete pub.ownerUserId; delete pub.passwordHash; delete pub.ownerToken; // không lộ ra ngoài
+  res.json(pub);
 });
 
 // Cập nhật session (chỉ owner). Dùng làm đường dự phòng ngoài WebSocket.

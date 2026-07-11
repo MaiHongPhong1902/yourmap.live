@@ -50,6 +50,24 @@ window.MSNet = (function () {
       if (ot) u += '&ot=' + encodeURIComponent(ot);
       return u;
     },
+    // ---- tài khoản & quản lý phiên ----
+    _json: function (path, method, body) {
+      var opt = { method: method || 'GET', headers: {}, credentials: 'same-origin' };
+      if (body) { opt.headers['content-type'] = 'application/json'; opt.body = JSON.stringify(body); }
+      return fetch(api(path), opt).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (data) {
+          if (!r.ok) { var e = new Error(data.error || ('http ' + r.status)); e.status = r.status; throw e; }
+          return data;
+        });
+      });
+    },
+    me: function () { return this._json('/auth/me'); },
+    register: function (username, password) { return this._json('/auth/register', 'POST', { username: username, password: password }); },
+    login: function (username, password) { return this._json('/auth/login', 'POST', { username: username, password: password }); },
+    logout: function () { return this._json('/auth/logout', 'POST', {}); },
+    mySessions: function () { return this._json('/my/sessions'); },
+    manage: function (token, patch) { return this._json('/sessions/' + encodeURIComponent(token) + '/manage', 'PATCH', patch); },
+    del: function (token) { return this._json('/sessions/' + encodeURIComponent(token), 'DELETE'); },
   };
 })();
 </script>
@@ -103,6 +121,22 @@ window.MSNet = (function () {
         <button onClick="{{ setViVi }}" style="{{ viBtnStyle }}">VI</button>
         <button onClick="{{ setEnEn }}" style="{{ enBtnStyle }}">EN</button>
       </div>
+      <!-- tài khoản -->
+      <sc-if value="{{ isLoggedIn }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ openDashboard }}" title="Quản lý phiên" style="display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:#fff;border:1.5px solid #e2e8f0;font-size:.78rem;font-weight:700;color:#0f172a;cursor:pointer;">
+          <span style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#dc2626,#475569);color:#fff;display:grid;place-items:center;font-size:.72rem;text-transform:uppercase;">{{ userInitial }}</span>
+          <span>{{ userName }}</span>
+        </button>
+        <button onClick="{{ doLogout }}" title="Đăng xuất" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;background:#fff;border:1.5px solid #e2e8f0;color:#64748b;cursor:pointer;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </sc-if>
+      <sc-if value="{{ isLoggedOut }}" hint-placeholder-val="{{ true }}">
+        <button onClick="{{ goLogin }}" style="display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;background:#dc2626;border:none;font-size:.8rem;font-weight:700;color:#fff;cursor:pointer;box-shadow:0 4px 12px rgba(220,38,38,.28);">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          {{ loginLabel }}
+        </button>
+      </sc-if>
     </div>
   </header>
 
@@ -157,6 +191,69 @@ window.MSNet = (function () {
           <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:8px;">{{ errorTitle }}</h2>
           <p style="color:#475569;line-height:1.6;margin-bottom:24px;">{{ errorMsg }}</p>
           <button onClick="{{ goHome }}" style="padding:12px 22px;border-radius:11px;border:none;background:#dc2626;color:#fff;font-weight:700;cursor:pointer;">{{ s.backHome }}</button>
+        </div>
+      </sc-if>
+
+      <!-- LOGIN / REGISTER -->
+      <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:40px 30px;max-width:400px;margin:20px auto 0;animation:fadeup .4s ease;">
+          <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#dc2626,#475569);display:grid;place-items:center;margin-bottom:18px;box-shadow:0 6px 16px rgba(220,38,38,.28);">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <h2 style="font-size:1.5rem;font-weight:800;margin-bottom:6px;">{{ authTitle }}</h2>
+          <p style="color:#94a3b8;font-size:.88rem;margin-bottom:22px;">{{ authSubtitle }}</p>
+          <form onSubmit="{{ submitAuth }}">
+            <input value="{{ authName }}" onChange="{{ onAuthName }}" placeholder="{{ authNamePh }}" autocomplete="username" style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:11px;font-size:.95rem;margin-bottom:11px;background:#fff;color:#0f172a;">
+            <input value="{{ authPass }}" onChange="{{ onAuthPass }}" placeholder="{{ authPassPh }}" type="password" autocomplete="current-password" style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:11px;font-size:.95rem;margin-bottom:6px;background:#fff;color:#0f172a;">
+            <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
+              <p style="color:#dc2626;font-size:.82rem;font-weight:600;margin:6px 2px 0;">{{ authError }}</p>
+            </sc-if>
+            <button type="submit" style="width:100%;margin-top:14px;padding:13px;border-radius:12px;border:none;background:#dc2626;color:#fff;font-weight:700;font-size:.95rem;cursor:pointer;box-shadow:0 8px 20px rgba(220,38,38,.28);">{{ authSubmitLabel }}</button>
+          </form>
+          <button onClick="{{ toggleAuthMode }}" style="width:100%;margin-top:14px;background:none;border:none;color:#dc2626;font-weight:700;font-size:.86rem;cursor:pointer;">{{ authSwitchText }}</button>
+        </div>
+      </sc-if>
+
+      <!-- DASHBOARD (quản lý phiên) -->
+      <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:26px 24px 40px;max-width:720px;margin:0 auto;animation:fadeup .4s ease;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;">
+            <h2 style="font-size:1.4rem;font-weight:800;">{{ dashTitle }}</h2>
+            <button onClick="{{ startCreate }}" style="display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border-radius:11px;border:none;background:#dc2626;color:#fff;font-weight:700;font-size:.86rem;cursor:pointer;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>{{ dashNewBtn }}
+            </button>
+          </div>
+          <sc-if value="{{ dashEmpty }}" hint-placeholder-val="{{ true }}">
+            <div style="text-align:center;padding:50px 20px;color:#94a3b8;">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.8" style="margin-bottom:12px;"><path d="M9 3H4a1 1 0 0 0-1 1v5a2 2 0 0 0 .59 1.42l9 9a2 2 0 0 0 2.82 0l5-5a2 2 0 0 0 0-2.82l-9-9A2 2 0 0 0 9 3z"/></svg>
+              <p style="font-size:.9rem;line-height:1.6;">{{ dashEmptyText }}</p>
+            </div>
+          </sc-if>
+          <div style="display:flex;flex-direction:column;gap:11px;">
+            <sc-for list="{{ mySessions }}" as="ms" hint-placeholder-count="0">
+              <div style="border:1.5px solid #e2e8f0;border-radius:14px;padding:14px 16px;background:#fff;">
+                <div style="display:flex;align-items:center;gap:9px;margin-bottom:4px;">
+                  <span style="{{ ms.dotStyle }}"></span>
+                  <span style="font-weight:800;font-size:1rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ ms.name }}</span>
+                  <span style="{{ ms.statusStyle }}">{{ ms.statusLabel }}</span>
+                </div>
+                <div style="font-size:.78rem;color:#94a3b8;margin-bottom:12px;">{{ ms.meta }}</div>
+                <div style="display:flex;flex-wrap:wrap;gap:7px;">
+                  <button onClick="{{ ms.openOwner }}" style="display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:9px;border:1.5px solid #e2e8f0;background:#fff;color:#0f172a;font-weight:700;font-size:.78rem;cursor:pointer;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.2"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>{{ dashOwner }}
+                  </button>
+                  <button onClick="{{ ms.openViewer }}" style="display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:9px;border:1.5px solid #e2e8f0;background:#fff;color:#0f172a;font-weight:700;font-size:.78rem;cursor:pointer;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/></svg>{{ dashViewer }}
+                  </button>
+                  <button onClick="{{ ms.rename }}" style="padding:8px 12px;border-radius:9px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;font-weight:700;font-size:.78rem;cursor:pointer;">{{ dashRename }}</button>
+                  <sc-if value="{{ ms.active }}" hint-placeholder-val="{{ true }}">
+                    <button onClick="{{ ms.end }}" style="padding:8px 12px;border-radius:9px;border:1.5px solid #fde68a;background:#fffbeb;color:#d97706;font-weight:700;font-size:.78rem;cursor:pointer;">{{ dashEnd }}</button>
+                  </sc-if>
+                  <button onClick="{{ ms.del }}" style="padding:8px 12px;border-radius:9px;border:1.5px solid #fecaca;background:#fff;color:#dc2626;font-weight:700;font-size:.78rem;cursor:pointer;">{{ dashDelete }}</button>
+                </div>
+              </div>
+            </sc-for>
+          </div>
         </div>
       </sc-if>
 
@@ -538,6 +635,9 @@ class Component extends DCLogic {
       viewerCount:0, now:Date.now(), expiresAt:null,
       toast:null, isMobile: window.innerWidth < 860,
       copied:'', sheetOpen:false,
+      // tài khoản & quản lý phiên
+      user:null, authChecked:false, authMode:'login', authName:'', authPass:'', authError:'', authBusy:false,
+      mySessions:[], mySessionsLoading:false,
     };
   }
 
@@ -557,6 +657,7 @@ class Component extends DCLogic {
       this._checkExpiry();
     }, 1000);
     this.setState({ gpsSupported: !!(navigator.geolocation) && false }); // georef unavailable → manual only
+    this._loadMe();
     this.route();
     this._syncMapImg();
   }
@@ -602,6 +703,12 @@ class Component extends DCLogic {
     const raw = (location.hash || '').replace(/^#\/?/, '');
     const seg = raw.split('/').filter(Boolean);
     if(seg.length === 0){ this.setState({ screen:'home' }); this._teardownChannel(); return; }
+    if(seg[0] === 'login'){ this.setState({ screen:'login', authError:'' }); this._teardownChannel(); return; }
+    if(seg[0] === 'dashboard'){
+      this._teardownChannel();
+      if(!this.state.user){ this.setState({ screen: this.state.authChecked?'login':'loading' }); return; }
+      this.setState({ screen:'dashboard' }); this._loadMySessions(); return;
+    }
     if(seg[0] === 'create'){ this.setState({ screen:'create', sheetOpen:true }); this._teardownChannel(); return; }
     if(seg[0] === 's' && seg[1]){
       const token = seg[1];
@@ -702,6 +809,76 @@ class Component extends DCLogic {
     if(!this._sessData || this._sessData.token !== this.state.token) return;
     Object.assign(this._sessData, patch);
     window.MSNet.create(this._sessData).catch(()=>{});
+  }
+
+  /* ---------------- tài khoản & quản lý phiên ---------------- */
+  _loadMe(){
+    if(!(window.MSNet && window.MSNet.enabled)){ this.setState({ authChecked:true }); return; }
+    window.MSNet.me().then((r)=>this.setState({ user:r.user||null, authChecked:true }, ()=>{ if(this.state.screen==='loading') this.route(); }))
+      .catch(()=>this.setState({ authChecked:true }, ()=>{ if(this.state.screen==='loading') this.route(); }));
+  }
+  setAuthMode(m){ this.setState({ authMode:m, authError:'' }); }
+  onAuthName(e){ this.setState({ authName:e.target.value }); }
+  onAuthPass(e){ this.setState({ authPass:e.target.value }); }
+  submitAuth(){
+    const { authMode, authName, authPass } = this.state;
+    if(this.state.authBusy) return;
+    if(!authName.trim() || !authPass){ this.setState({ authError: this.state.lang==='vi'?'Nhập tên đăng nhập và mật khẩu.':'Enter username and password.' }); return; }
+    this.setState({ authBusy:true, authError:'' });
+    const fn = authMode==='register' ? window.MSNet.register(authName.trim(), authPass) : window.MSNet.login(authName.trim(), authPass);
+    fn.then((r)=>{
+      this.setState({ user:r.user, authBusy:false, authName:'', authPass:'', authError:'' });
+      const back = this._afterAuth; this._afterAuth = null;
+      if(back === 'create'){ this.startCreate(); }
+      else if(back === 'demo'){ this.demoOpen(); }
+      else { this._nav('dashboard'); }
+    }).catch((err)=>{
+      this.setState({ authBusy:false, authError: err.message || (this.state.lang==='vi'?'Có lỗi xảy ra.':'Something went wrong.') });
+    });
+  }
+  logout(){ window.MSNet.logout().catch(()=>{}); this.setState({ user:null, mySessions:[] }); this._nav(''); }
+  requireAuth(then){ // gọi khi cần đăng nhập trước khi tạo phiên
+    if(this.state.user){ return true; }
+    this._afterAuth = then || null; this._nav('login'); return false;
+  }
+  openDashboard(){ if(this.state.user){ this._nav('dashboard'); } else { this._nav('login'); } }
+  _loadMySessions(){
+    if(!this.state.user) return;
+    this.setState({ mySessionsLoading:true });
+    window.MSNet.mySessions().then((r)=>this.setState({ mySessions:r.sessions||[], mySessionsLoading:false }))
+      .catch(()=>this.setState({ mySessionsLoading:false }));
+  }
+  openOwnerLink(s){ this._nav('s/'+s.token+(s.ownerToken?('/owner/'+s.ownerToken):'')); }
+  openViewerLink(s){ window.open(this._base()+'#/s/'+s.token, '_blank'); }
+  renameMySession(s){
+    const name = window.prompt(this.state.lang==='vi'?'Đổi tên phiên:':'Rename session:', s.name||'');
+    if(name===null) return;
+    window.MSNet.manage(s.token, { name:name.slice(0,80) }).then(()=>this._loadMySessions()).catch(()=>this._toast(this.L().syncFail));
+  }
+  endMySession(s){
+    if(!window.confirm(this.state.lang==='vi'?'Kết thúc phiên này? Người xem sẽ không truy cập được nữa.':'End this session? Viewers will lose access.')) return;
+    window.MSNet.manage(s.token, { status:'ended' }).then(()=>this._loadMySessions()).catch(()=>this._toast(this.L().syncFail));
+  }
+  deleteMySession(s){
+    if(!window.confirm(this.state.lang==='vi'?'Xóa hẳn phiên này? Không thể hoàn tác.':'Delete this session permanently? This cannot be undone.')) return;
+    window.MSNet.del(s.token).then(()=>this._loadMySessions()).catch(()=>this._toast(this.L().syncFail));
+  }
+  _sessionRow(s){
+    const vi = this.state.lang==='vi';
+    let statusLabel, statusColor;
+    if(s.status==='ended'){ statusLabel = vi?'Đã kết thúc':'Ended'; statusColor='#94a3b8'; }
+    else if(s.expired){ statusLabel = vi?'Hết hạn':'Expired'; statusColor='#d97706'; }
+    else { statusLabel = vi?'Đang hoạt động':'Active'; statusColor='#16a34a'; }
+    const active = s.status!=='ended' && !s.expired;
+    const meta = s.viewers + (vi?' người xem · ':' viewers · ') + s.nodes + (vi?' điểm':' points');
+    return {
+      token:s.token, name: s.name || (vi?'(không tên)':'(untitled)'),
+      statusLabel, meta, active,
+      dotStyle:'width:8px;height:8px;border-radius:50%;flex:none;background:'+statusColor+';',
+      statusStyle:'font-size:.74rem;font-weight:700;color:'+statusColor+';',
+      openOwner:()=>this.openOwnerLink(s), openViewer:()=>this.openViewerLink(s),
+      rename:()=>this.renameMySession(s), end:()=>this.endMySession(s), del:()=>this.deleteMySession(s),
+    };
   }
 
   /* ---------------- nạp session từ server ---------------- */
@@ -1270,10 +1447,11 @@ class Component extends DCLogic {
   clearRoute(){ if(this._anim){ clearInterval(this._anim); this._anim=null; } this.setState({ route:null, routeError:null, searchSegs:[], viewerPos:null, picking:false }); }
 
   /* ---------------- session actions ---------------- */
-  startCreate(){ this._sessData=null; this.hist=[{nodes:[],edges:[]}]; this.hptr=0; this.setState({ nodes:[], edges:[], labels:[], histIdx:0, histLen:1, penLast:null, connectFrom:null, ownerPos:null, created:false, token:null, createTab:'map', aerialChosen:false }); this._nav('create'); }
+  startCreate(){ if(!this.requireAuth('create')) return; this._sessData=null; this.hist=[{nodes:[],edges:[]}]; this.hptr=0; this.setState({ nodes:[], edges:[], labels:[], histIdx:0, histLen:1, penLast:null, connectFrom:null, ownerPos:null, created:false, token:null, createTab:'map', aerialChosen:false }); this._nav('create'); }
   goHome(){ this._teardownChannel(); this._nav(''); }
   demoOpen(){ // quick demo: create a session with the sample map and jump to graph editor
-    this.setState({ mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048, aerialChosen:true, nodes:[], edges:[], ownerPos:{xRatio:0.55,yRatio:0.46} });
+    if(!this.requireAuth('demo')) return;
+    this.setState({ mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048, aerialChosen:true, nodes:[], edges:[], labels:[], ownerPos:{xRatio:0.55,yRatio:0.46} });
     this._createSession(60, null, ()=>{ this.setState({screen:'create', createTab:'graph', sheetOpen:true}); this._scheduleFit(); this._toast(this.L().demoReady); });
   }
   chooseAerial(){ this.setState({ mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048, aerialChosen:true, createTab:'pos' }); this._scheduleFit(); }
@@ -1312,17 +1490,22 @@ class Component extends DCLogic {
   onTogglePw(e){ this.setState({ usePassword:e.target.checked }); }
   onPassword(e){ this.setState({ password:e.target.value }); }
 
+  _defaultSessionName(){
+    try{ const d=new Date(); const p=(n)=>('0'+n).slice(-2);
+      return (this.state.lang==='vi'?'Phiên ':'Session ') + p(d.getDate())+'/'+p(d.getMonth()+1)+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+    catch(e){ return this.state.lang==='vi'?'Phiên mới':'New session'; }
+  }
   _createSession(minutes, pw, cb){
     const token = this._rid(24);
     const ownerToken = this._rid(20);
     const expiresAt = minutes>0 ? Date.now()+minutes*60000 : null;
     const sess = {
-      token, ownerTokenHash: this._hash(ownerToken),
+      token, ownerTokenHash: this._hash(ownerToken), ownerToken,
       mapImage:this.state.mapImage, mapW:this.state.mapW, mapH:this.state.mapH,
       nodes:this.state.nodes, edges:this.state.edges, labels:this.state.labels,
       ownerPos:this.state.ownerPos, ownerLocked:false,
       createdAt:Date.now(), expiresAt, hasPassword: !!pw, passwordHash: pw?this._hash(pw):null,
-      status:'active',
+      status:'active', name: this._defaultSessionName(),
     };
     try{ localStorage.setItem(this._key(token), JSON.stringify(sess)); }
     catch(err){ this._toast(this.L().storageFull); }
@@ -1446,6 +1629,8 @@ class Component extends DCLogic {
     const isGraph = st.screen === 'graph';
     const isOwner = st.screen === 'owner';
     const isViewer = st.screen === 'viewer';
+    const isLogin = st.screen === 'login';
+    const isDashboard = st.screen === 'dashboard';
     const isError = ['notfound','expired','denied','ended','loading'].includes(st.screen);
     const showMap = isCreate || isGraph || isOwner || isViewer;
     const panelIsSheet = st.isMobile && showMap;
@@ -1453,7 +1638,7 @@ class Component extends DCLogic {
     let bodyLayout = "flex:1;min-height:0;display:flex;";
     if(st.isMobile) bodyLayout += "position:relative;"; // map chiếm toàn bộ, panel là sheet phủ lên
     let panelStyle;
-    if(isHome || isError){ panelStyle = "flex:1;overflow-y:auto;"; }
+    if(isHome || isError || isLogin || isDashboard){ panelStyle = "flex:1;overflow-y:auto;"; }
     else if(panelIsSheet){
       // Mobile: bảng điều khiển là bottom-sheet trượt lên, ẩn đi để map hiện full.
       const base = "position:absolute;left:0;right:0;bottom:0;height:54vh;max-height:calc(100% - 12px);background:#fff;border-radius:22px 22px 0 0;box-shadow:0 -10px 34px rgba(15,23,42,.24);overflow:hidden;z-index:46;display:flex;flex-direction:column;padding-top:20px;transition:transform .3s cubic-bezier(.4,0,.2,1);will-change:transform;";
@@ -1555,7 +1740,34 @@ class Component extends DCLogic {
       statusDot: (st.expiresAt && st.expiresAt-st.now<5*60000)?'#dc2626':'#16a34a',
       statusGlow: (st.expiresAt && st.expiresAt-st.now<5*60000)?'rgba(220,38,38,.2)':'rgba(22,163,74,.2)',
       // screens
-      isHome, isCreate, isGraph, isOwner, isViewer, isError, showMap,
+      isHome, isCreate, isGraph, isOwner, isViewer, isError, showMap, isLogin, isDashboard,
+      // ---- tài khoản & bảng quản lý ----
+      user: st.user, isLoggedIn: !!st.user, isLoggedOut: !st.user, userName: st.user ? st.user.username : '',
+      userInitial: st.user && st.user.username ? st.user.username.charAt(0) : '?',
+      loginLabel: st.lang==='vi'?'Đăng nhập':'Sign in',
+      openDashboard:()=>this.openDashboard(), doLogout:()=>this.logout(),
+      goLogin:()=>this._nav('login'),
+      authIsRegister: st.authMode === 'register',
+      authTitle: st.authMode==='register' ? (st.lang==='vi'?'Đăng ký':'Sign up') : (st.lang==='vi'?'Đăng nhập':'Sign in'),
+      authSwitchText: st.authMode==='register' ? (st.lang==='vi'?'Đã có tài khoản? Đăng nhập':'Have an account? Sign in') : (st.lang==='vi'?'Chưa có tài khoản? Đăng ký':'No account? Sign up'),
+      authName: st.authName, authPass: st.authPass, authError: st.authError, authBusy: st.authBusy,
+      authNamePh: st.lang==='vi'?'Tên đăng nhập':'Username', authPassPh: st.lang==='vi'?'Mật khẩu':'Password',
+      onAuthName:(e)=>this.onAuthName(e), onAuthPass:(e)=>this.onAuthPass(e),
+      submitAuth:(e)=>{ if(e&&e.preventDefault)e.preventDefault(); this.submitAuth(); }, toggleAuthMode:()=>this.setAuthMode(st.authMode==='register'?'login':'register'),
+      authSubmitLabel: st.authBusy ? '…' : (st.authMode==='register' ? (st.lang==='vi'?'Tạo tài khoản':'Create account') : (st.lang==='vi'?'Đăng nhập':'Sign in')),
+      dashTitle: st.lang==='vi'?'Phiên của tôi':'My sessions',
+      mySessions: (st.mySessions||[]).map((s)=>this._sessionRow(s)),
+      mySessionsLoading: st.mySessionsLoading,
+      dashEmpty: !st.mySessionsLoading && (st.mySessions||[]).length===0,
+      dashEmptyText: st.lang==='vi'?'Chưa có phiên nào. Tạo phiên mới để bắt đầu.':'No sessions yet. Create one to get started.',
+      dashNewBtn: st.lang==='vi'?'Tạo phiên mới':'New session',
+      dashReload:()=>this._loadMySessions(),
+      authSubtitle: st.authMode==='register' ? (st.lang==='vi'?'Tạo tài khoản để tạo và quản lý phiên chia sẻ.':'Create an account to create and manage share sessions.') : (st.lang==='vi'?'Đăng nhập để quản lý phiên chia sẻ của bạn.':'Sign in to manage your share sessions.'),
+      dashOwner: st.lang==='vi'?'Chủ phiên':'Owner',
+      dashViewer: st.lang==='vi'?'Người xem':'Viewer',
+      dashRename: st.lang==='vi'?'Đổi tên':'Rename',
+      dashEnd: st.lang==='vi'?'Kết thúc':'End',
+      dashDelete: st.lang==='vi'?'Xóa':'Delete',
       bodyLayoutStyle: bodyLayout, panelStyle,
       // mobile: create/graph vẫn dùng bottom-sheet (biểu mẫu/bộ công cụ nhiều mục);
       // viewer/owner dùng nút hành động nổi trực tiếp trên bản đồ.

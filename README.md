@@ -57,6 +57,10 @@ Sau đó mở trình duyệt tại **http://localhost:3000**.
 | `DATA_DIR`     | `./data`     | Nơi lưu file JSON của phiên               |
 | `UPLOAD_DIR`   | `./uploads`  | Nơi lưu ảnh bản đồ được upload            |
 | `MAX_UPLOAD_MB`| `10`         | Giới hạn dung lượng ảnh upload (MB)       |
+| `AUTH_SECRET`  | *(tự sinh)*  | Khóa ký token đăng nhập. Nếu bỏ trống, tự sinh & lưu `data/.authsecret`. Đặt cố định khi chạy nhiều tiến trình/instance. |
+
+> Tài khoản người dùng lưu ở `data/users.json` (mật khẩu băm bằng scrypt).
+> Cần **đăng nhập để tạo phiên**; người xem mở link không cần đăng nhập.
 
 Ví dụ: `PORT=8080 node server.js`
 

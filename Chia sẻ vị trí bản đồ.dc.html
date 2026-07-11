@@ -1417,16 +1417,58 @@ class Component extends DCLogic {
     }
     return null;
   }
+  /**
+   * Tìm tuyến ngắn nhất theo TỔNG quãng đường, không chỉ dựa vào node gần nhất.
+   * Xét K node gần nhất quanh người xem làm điểm vào và K node gần nhất quanh
+   * chủ phiên làm điểm ra, rồi Dijkstra đa nguồn để chọn tổ hợp cho tổng
+   * (vào thẳng + đường trên graph + ra thẳng) nhỏ nhất. Node gần nhưng dẫn tới
+   * đường vòng dài hơn sẽ bị bỏ qua để ưu tiên tổng quãng đường ngắn hơn.
+   */
+  _bestRoute(vp, op){
+    const nodes = this.state.nodes;
+    if(nodes.length < 1) return null;
+    const K = 8; // số node ứng viên gần nhất xét cho điểm vào/ra
+    const nodeById = {}; nodes.forEach(n=>nodeById[n.id]=n);
+    const nearestK = (pt)=> nodes.map(n=>({ id:n.id, d:this._dist(n, pt) })).sort((a,b)=>a.d-b.d).slice(0, K);
+    const startCands = nearestK(vp);
+    const goalCands = {}; nearestK(op).forEach(c=>{ goalCands[c.id] = c.d; });
+    const adj = this._adjacency();
+    const g = {}, came = {}, segs = [];
+    const open = new Set();
+    for(const c of startCands){ g[c.id] = c.d; open.add(c.id); } // chi phí vào = khoảng cách thẳng từ người xem
+    while(open.size){
+      let cur=null, cg=Infinity;
+      open.forEach(id=>{ if(g[id] < cg){ cg=g[id]; cur=id; } });
+      if(cur===null) break;
+      open.delete(cur);
+      for(const nb of (adj[cur]||[])){
+        const t = g[cur] + nb.w;
+        if(t < (g[nb.to]!=null?g[nb.to]:Infinity)){
+          came[nb.to]=cur; g[nb.to]=t; open.add(nb.to);
+          const a=nodeById[cur], b=nodeById[nb.to];
+          segs.push({ x1:a.xRatio*1000, y1:a.yRatio*this._vbH(), x2:b.xRatio*1000, y2:b.yRatio*this._vbH() });
+        }
+      }
+    }
+    // điểm ra: chỉ so sánh trong các node gần chủ phiên → chọn tổng nhỏ nhất
+    let bestNode=null, bestTotal=Infinity;
+    for(const id in goalCands){
+      if(g[id]==null) continue;
+      const total = g[id] + goalCands[id];
+      if(total < bestTotal){ bestTotal=total; bestNode=id; }
+    }
+    if(bestNode===null) return null;
+    const path=[bestNode]; let cur=bestNode;
+    while(came[cur]!==undefined){ cur=came[cur]; path.unshift(cur); }
+    return { path, dist:bestTotal, segs };
+  }
   findRoute(){
     const L = this.L();
     const st = this.state;
     if(!st.ownerPos){ this.setState({ routeError:L.errNoOwner }); this._toast(L.errNoOwner); return; }
     if(!st.viewerPos){ this.setState({ routeError:L.errNoViewer, picking:true, sheetOpen:false }); this._toast(L.errNoViewer); return; }
     if(st.nodes.length < 2){ this.setState({ routeError:L.errNoGraph }); this._toast(L.errNoGraph); return; }
-    const sNear = this._nearestNode(st.viewerPos);
-    const gNear = this._nearestNode(st.ownerPos);
-    if(!sNear || !gNear){ this.setState({ routeError:L.errNoGraph }); this._toast(L.errNoGraph); return; }
-    const res = this._astar(sNear.node.id, gNear.node.id);
+    const res = this._bestRoute(st.viewerPos, st.ownerPos);
     if(!res){ this.setState({ route:null, routeError:L.errNoPath, searchSegs:[] }); this._toast(L.errNoPath); return; }
     // animate the search frontier, then reveal the route
     this.setState({ routeError:null, route:null, searchSegs:[] });
@@ -1437,8 +1479,7 @@ class Component extends DCLogic {
       this.setState({ searchSegs: segs.slice(0, i) });
       if(i >= segs.length){
         clearInterval(this._anim); this._anim=null;
-        const nodeById={}; st.nodes.forEach(n=>nodeById[n.id]=n);
-        const totalDist = res.dist + sNear.dist + gNear.dist;
+        const totalDist = res.dist; // đã gồm vào thẳng + đường trên graph + ra thẳng
         setTimeout(()=>this.setState({ route:res.path, routeDist:Math.round(totalDist), routeHops:res.path.length, searchSegs:[] }), 180);
       }
     }, 45);

@@ -394,7 +394,7 @@ window.MSNet = (function () {
                 <div style="position:absolute;left:{{ ownerPinL }}%;top:{{ ownerPinT }}%;transform:translate(-50%,-100%) scale(calc(1/var(--z,1)));transform-origin:bottom center;pointer-events:auto;cursor:{{ ownerPinCursor }};animation:pinpop .3s ease;" onPointerDown="{{ onOwnerPinDown }}">
                   <sc-if value="{{ ownerPinLive }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:50%;bottom:-4px;width:24px;height:24px;border-radius:50%;background:#dc2626;animation:ripple 1.4s ease-out infinite;"></div></sc-if>
                   <div style="position:relative;width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#dc2626;box-shadow:0 4px 10px rgba(0,0,0,.35);border:2.5px solid #fff;display:grid;place-items:center;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" style="transform:rotate(45deg);"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(45deg);"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
                   </div>
                 </div>
               </sc-if>
@@ -713,6 +713,20 @@ class Component extends DCLogic {
   /* ---------------- transform / pan / zoom ---------------- */
   _applyTransform(){ const w = this.worldRef.current; if(!w) return; w.style.transform = `translate(${this.tx}px,${this.ty}px) scale(${this.sc})`; w.style.setProperty('--z', this.sc); }
   _pointerDown(e){
+    // theo dõi mọi ngón để hỗ trợ pinch-zoom (2 ngón) trên mobile
+    this._ptrs = this._ptrs || {};
+    this._ptrs[e.pointerId] = { x:e.clientX, y:e.clientY };
+    const ids = Object.keys(this._ptrs);
+    if(ids.length >= 2){
+      this.drag = null;
+      if(this.state.regionDraft) this.setState({ regionDraft:null });
+      const p = ids.map(id=>this._ptrs[id]);
+      const vp = this.vpRef.current.getBoundingClientRect();
+      const mx = (p[0].x+p[1].x)/2 - vp.left, my = (p[0].y+p[1].y)/2 - vp.top;
+      this._pinch = { d0: Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y) || 1, sc0:this.sc,
+        wx:(mx - this.tx)/this.sc, wy:(my - this.ty)/this.sc };
+      return;
+    }
     if(e.target.closest('[data-pin]') || e.target.tagName === 'circle') return; // handled by element
     const st = this.state;
     const editingGraph = st.screen === 'graph' || (st.screen === 'create' && st.createTab === 'graph');
@@ -725,6 +739,18 @@ class Component extends DCLogic {
     this.drag = { mode:'pan', x:e.clientX, y:e.clientY, ox:this.tx, oy:this.ty, moved:false };
   }
   _pointerMove(e){
+    if(this._ptrs && this._ptrs[e.pointerId]) this._ptrs[e.pointerId] = { x:e.clientX, y:e.clientY };
+    if(this._pinch){
+      const ids = Object.keys(this._ptrs||{});
+      if(ids.length < 2) return;
+      const p = ids.map(id=>this._ptrs[id]);
+      const vp = this.vpRef.current.getBoundingClientRect();
+      const dd = Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y) || 1;
+      const mx = (p[0].x+p[1].x)/2 - vp.left, my = (p[0].y+p[1].y)/2 - vp.top;
+      const ns = Math.min(9, Math.max(0.4, this._pinch.sc0 * (dd/this._pinch.d0)));
+      this.sc = ns; this.tx = mx - this._pinch.wx*ns; this.ty = my - this._pinch.wy*ns; this._applyTransform();
+      return;
+    }
     const d = this.drag; if(!d) return;
     const dx = e.clientX - d.x, dy = e.clientY - d.y;
     if(Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
@@ -735,6 +761,9 @@ class Component extends DCLogic {
     else if(d.mode === 'region'){ const r = this._ratio(e.clientX, e.clientY); d.cx = r.xRatio; d.cy = r.yRatio; this.setState({ regionDraft:{ x:Math.min(d.sx,d.cx), y:Math.min(d.sy,d.cy), w:Math.abs(d.cx-d.sx), h:Math.abs(d.cy-d.sy) } }); }
   }
   _pointerUp(e){
+    if(this._ptrs) delete this._ptrs[e.pointerId];
+    const remaining = this._ptrs ? Object.keys(this._ptrs).length : 0;
+    if(this._pinch){ if(remaining < 2){ this._pinch = null; this.drag = null; } return; }
     const d = this.drag; this.drag = null; if(!d) return;
     if(d.mode === 'pan' && !d.moved){ this._mapClick(e); }
     else if(d.mode === 'node' && d.moved){ this._applyGraph(this.state.nodes, this.state.edges); }
@@ -1269,7 +1298,7 @@ class Component extends DCLogic {
   lockOwner(){ if(!this.state.ownerPos){ this._toast(this.L().needOwnerPos); return; } this.setState({ ownerLocked:true }, ()=>this._saveOwner()); this._toast(this.L().locked); }
   unlockOwner(){ this.setState({ ownerLocked:false }, ()=>this._saveOwner()); }
   endSession(){ this._save({ status:'ended' }); this._send({type:'end'}); this._pushServer({ status:'ended' }); this._toast(this.L().sessionEnded); this.setState({ screen:'ended' }); }
-  startPickViewer(){ this.setState({ picking:true }); this._toast(this.L().pickHint); }
+  startPickViewer(){ this.setState({ picking:true, sheetOpen:false }); this._toast(this.L().pickHint); } // đóng sheet để lộ toàn bản đồ (mobile)
   useGps(){ this._toast(this.L().gpsUnavailable); }
   _drawQR(text){
     try{

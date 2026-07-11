@@ -26,12 +26,17 @@ window.MSNet = (function () {
         return r.json();
       });
     },
-    create: function (sess) {
+    create: function (sess, tries) {
+      if (tries == null) tries = 3;
       return fetch(api('/sessions'), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(sess),
-      }).then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); });
+      }).then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+        .catch(function (err) {
+          if (tries > 1) return new Promise(function (res) { setTimeout(res, 600); }).then(function () { return window.MSNet.create(sess, tries - 1); });
+          throw err;
+        });
     },
     upload: function (blob, filename) {
       var fd = new FormData();
@@ -693,19 +698,27 @@ class Component extends DCLogic {
   _pushServer(patch){
     if(!(window.MSNet && window.MSNet.enabled)) return;
     if(this.ws && this.ws.readyState === 1) return; // đang có WS → server tự lưu qua kênh realtime
-    if(!this._sessData) return; // chỉ client tạo phiên mới giữ bản đầy đủ
+    // Chỉ đẩy khi bản đầy đủ khớp ĐÚNG phiên đang mở (tránh ghi đè nhầm phiên khác).
+    if(!this._sessData || this._sessData.token !== this.state.token) return;
     Object.assign(this._sessData, patch);
     window.MSNet.create(this._sessData).catch(()=>{});
   }
 
   /* ---------------- nạp session từ server ---------------- */
-  _fetchRemote(token){
+  _fetchRemote(token, attempt){
+    attempt = attempt || 0;
+    const retryOrFail = ()=>{
+      // Thử lại vài lần: người xem có thể mở link ngay khi POST tạo phiên chưa kịp lưu.
+      if(attempt < 6 && this._remoteTried && this._remoteTried[token]){
+        this._fetchTimer = setTimeout(()=>this._fetchRemote(token, attempt+1), 700);
+      } else { this.setState({ screen:'notfound' }); }
+    };
     window.MSNet.get(token).then((sess)=>{
       if(sess && sess.token){
         try{ localStorage.setItem(this._key(token), JSON.stringify(sess)); }catch(e){}
         this.route();
-      } else { this.setState({ screen:'notfound' }); }
-    }).catch(()=>{ this.setState({ screen:'notfound' }); });
+      } else { retryOrFail(); }
+    }).catch(retryOrFail);
   }
 
   /* ---------------- realtime (BroadcastChannel + WebSocket) ---------------- */
@@ -1257,7 +1270,7 @@ class Component extends DCLogic {
   clearRoute(){ if(this._anim){ clearInterval(this._anim); this._anim=null; } this.setState({ route:null, routeError:null, searchSegs:[], viewerPos:null, picking:false }); }
 
   /* ---------------- session actions ---------------- */
-  startCreate(){ this.hist=[{nodes:[],edges:[]}]; this.hptr=0; this.setState({ nodes:[], edges:[], histIdx:0, histLen:1, penLast:null, connectFrom:null, ownerPos:null, created:false, token:null, createTab:'map', aerialChosen:false }); this._nav('create'); }
+  startCreate(){ this._sessData=null; this.hist=[{nodes:[],edges:[]}]; this.hptr=0; this.setState({ nodes:[], edges:[], labels:[], histIdx:0, histLen:1, penLast:null, connectFrom:null, ownerPos:null, created:false, token:null, createTab:'map', aerialChosen:false }); this._nav('create'); }
   goHome(){ this._teardownChannel(); this._nav(''); }
   demoOpen(){ // quick demo: create a session with the sample map and jump to graph editor
     this.setState({ mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048, aerialChosen:true, nodes:[], edges:[], ownerPos:{xRatio:0.55,yRatio:0.46} });
@@ -1316,7 +1329,7 @@ class Component extends DCLogic {
     // Giữ bản đầy đủ để re-POST khi chủ phiên chỉnh sửa tiếp ở màn tạo phiên.
     this._sessData = sess;
     // Đẩy lên server để thiết bị khác mở được link (bỏ qua nếu chạy offline/file://).
-    if(window.MSNet && window.MSNet.enabled){ window.MSNet.create(sess).catch(()=>{}); }
+    if(window.MSNet && window.MSNet.enabled){ window.MSNet.create(sess).catch(()=>{ this._toast(this.L().syncFail); }); }
     this.setState({ token, ownerToken, expiresAt, created:true }, cb);
   }
   generateLink(){
@@ -1380,7 +1393,7 @@ class Component extends DCLogic {
         labelPrompt:'Nhập tên cho điểm này:', labelAreaPrompt:'Nhập tên cho vùng này:', labelEditPrompt:'Sửa tên (để trống để xóa):', labelHelp:'Nhấn để đặt tên một điểm; kéo để khoanh và đặt tên một vùng. Nhấn lại nhãn để sửa/xóa.', labelAdded:'Đã thêm tên', labelRemoved:'Đã xóa tên', oneWay:'Một chiều', twoWay:'Hai chiều', newEdgeDir:'Đường mới:', showHelp:'Nhấn ảnh để thêm điểm (node) — nhấn lên một đoạn đã có để chèn điểm vào giữa. Chuyển sang "Nối đường" rồi nhấn 2 điểm để tạo đoạn đường.', nodesEdges:'điểm · đoạn', clearAll:'Xóa tất cả', selectedEdge:'Đoạn đường đã chọn', weight:'Trọng số (khoảng cách)', blocked:'Chặn đoạn này', deleteEdge:'Xóa đoạn', graphCleared:'Đã xóa road graph', selectedNode:'Điểm đã chọn', deleteNode:'Xóa điểm', connectHint:'Đã chọn điểm đầu — nhấn điểm tiếp theo (hoặc nhấn lên đường) để nối. Nhấn lại điểm đó để dừng.', connectHelp:'Nhấn hai điểm để nối. Nhấn thẳng lên một đường có sẵn sẽ tự chèn điểm tại đó. Đường cắt nhau tự tạo điểm giao.', noSelection:'Chưa chọn đối tượng nào. Nhấn một điểm hoặc đoạn đường.',
         ownerTitle:'Chủ phiên', ownerTitleEn:'Session owner', viewersOnline:'Người đang xem', timeLeft:'Còn lại', ownerSet:'Nhấn hoặc kéo để đặt vị trí của bạn.', ownerLockedLabel:'Vị trí đã khóa. Mở khóa để chỉnh.', lock:'Khóa vị trí', unlock:'Mở khóa để chỉnh', ownerHelp:'Vị trí của bạn được cập nhật theo thời gian thực cho mọi người đang mở cùng phiên.', endSession:'Kết thúc phiên', locked:'Đã khóa vị trí', sessionEnded:'Phiên đã kết thúc',
         viewerTitle:'Người xem', viewerTitleEn:'Viewer', sessActive:'Phiên đang hoạt động', sessExpiring:'Phiên sắp hết hạn', ownerReady:'Chủ phiên đã ghim vị trí', ownerWaiting:'Chủ phiên chưa đặt vị trí…', pick:'Chọn vị trí của tôi', picking:'Nhấn lên bản đồ…', useGps:'Dùng vị trí GPS', findRoute:'Chỉ đường', clearRoute:'Xóa đường đi', distance:'Khoảng cách ước tính', hops:'điểm trên tuyến', pickHint:'Nhấn lên bản đồ để đặt điểm bắt đầu.',
-        errNoOwner:'Chủ phiên chưa đặt vị trí.', errNoViewer:'Hãy chọn vị trí bắt đầu của bạn trước.', errNoGraph:'Bản đồ chưa có đủ đường đi (cần ít nhất 2 điểm).', errNoPath:'Không tìm được đường nối giữa hai điểm.', needOwnerPos:'Hãy đặt vị trí chủ phiên trước.', viewerOpened:'Đã mở tab người xem', demoReady:'Demo sẵn sàng — hãy vẽ đường & mở link người xem', pickHint2:'', nodeOnEdge:'Đã chèn điểm vào đoạn đường có sẵn', undo:'Hoàn tác', redo:'Làm lại', toolPen:'Bút vẽ đường', penHint:'Vẽ đường liền mạch bằng cách nhấn nối tiếp', penOn:'Đang bật — nhấn để tắt', penHelp:'Nhấn lên bản đồ để bắt đầu vẽ. Mỗi lần nhấn thêm một điểm và tự nối với điểm trước.', penContinue:'Nhấn tiếp để kéo dài đường · nhấn lại điểm cuối (hoặc Esc) để kết thúc nét.', saveMap:'Lưu bản đồ', loadMap:'Tải bản đồ', mapSaved:'Đã lưu bản đồ ra file JSON', mapLoaded:'Đã tải bản đồ từ file', badFile:'File không hợp lệ', copyFail:'Link đã được bôi chọn — nhấn Ctrl/Cmd+C để sao chép', storageFull:'Ảnh quá lớn để đồng bộ giữa các tab.', gpsUnavailable:'Ảnh bản đồ chưa được georeference nên GPS không khả dụng — hãy chọn thủ công.',
+        errNoOwner:'Chủ phiên chưa đặt vị trí.', errNoViewer:'Hãy chọn vị trí bắt đầu của bạn trước.', errNoGraph:'Bản đồ chưa có đủ đường đi (cần ít nhất 2 điểm).', errNoPath:'Không tìm được đường nối giữa hai điểm.', needOwnerPos:'Hãy đặt vị trí chủ phiên trước.', viewerOpened:'Đã mở tab người xem', demoReady:'Demo sẵn sàng — hãy vẽ đường & mở link người xem', pickHint2:'', nodeOnEdge:'Đã chèn điểm vào đoạn đường có sẵn', undo:'Hoàn tác', redo:'Làm lại', toolPen:'Bút vẽ đường', penHint:'Vẽ đường liền mạch bằng cách nhấn nối tiếp', penOn:'Đang bật — nhấn để tắt', penHelp:'Nhấn lên bản đồ để bắt đầu vẽ. Mỗi lần nhấn thêm một điểm và tự nối với điểm trước.', penContinue:'Nhấn tiếp để kéo dài đường · nhấn lại điểm cuối (hoặc Esc) để kết thúc nét.', saveMap:'Lưu bản đồ', loadMap:'Tải bản đồ', mapSaved:'Đã lưu bản đồ ra file JSON', mapLoaded:'Đã tải bản đồ từ file', badFile:'File không hợp lệ', copyFail:'Link đã được bôi chọn — nhấn Ctrl/Cmd+C để sao chép', storageFull:'Ảnh quá lớn để đồng bộ giữa các tab.', syncFail:'Không lưu được phiên lên máy chủ — kiểm tra kết nối rồi thử lại.', gpsUnavailable:'Ảnh bản đồ chưa được georeference nên GPS không khả dụng — hãy chọn thủ công.',
         loadingTitle:'Đang tải phiên…', loadingMsg:'Đang lấy dữ liệu phiên từ máy chủ, vui lòng đợi.',
         notfoundTitle:'Không tìm thấy phiên', notfoundMsg:'Đường link không hợp lệ hoặc phiên đã bị xóa.', expiredTitle:'Phiên đã hết hạn', expiredMsg:'Phiên này đã quá thời gian hoạt động và không còn truy cập được.', deniedTitle:'Không có quyền', deniedMsg:'Token quản trị không hợp lệ. Bạn không có quyền chỉnh sửa phiên này.', endedTitle:'Phiên đã kết thúc', endedMsg:'Chủ phiên đã kết thúc phiên này.',
         expNever:'Không hết hạn', min15:'15 phút', min60:'1 giờ', min240:'4 giờ', min1440:'24 giờ', mapClickAdd:'Nhấn để thêm điểm · kéo để di chuyển bản đồ', mapDragOwner:'Nhấn / kéo để đặt vị trí của bạn', mapPickViewer:'Nhấn lên bản đồ để chọn điểm bắt đầu', mapPan:'Kéo để di chuyển · lăn chuột để phóng to' },
@@ -1393,7 +1406,7 @@ class Component extends DCLogic {
         labelPrompt:'Enter a name for this point:', labelAreaPrompt:'Enter a name for this area:', labelEditPrompt:'Edit name (leave empty to delete):', labelHelp:'Tap to name a point; drag to outline and name an area. Tap a label again to edit or remove it.', labelAdded:'Label added', labelRemoved:'Label removed', oneWay:'One-way', twoWay:'Two-way', newEdgeDir:'New edge:', showHelp:'Click the map to add nodes — click an existing edge to insert a node onto it. Switch to "Connect" and click two nodes to make a road.', nodesEdges:'nodes · edges', clearAll:'Clear all', selectedEdge:'Selected edge', weight:'Weight (distance)', blocked:'Block this edge', deleteEdge:'Delete edge', graphCleared:'Road graph cleared', selectedNode:'Selected node', deleteNode:'Delete node', connectHint:'First node chosen — click the next node (or a road) to connect. Click it again to stop.', connectHelp:'Click two nodes to connect. Click directly on an existing road to insert a point there. Crossing roads auto-create an intersection node.', noSelection:'Nothing selected. Click a node or edge.',
         ownerTitle:'Session owner', ownerTitleEn:'Chủ phiên', viewersOnline:'Viewers online', timeLeft:'Time left', ownerSet:'Click or drag to set your position.', ownerLockedLabel:'Position locked. Unlock to edit.', lock:'Lock position', unlock:'Unlock to edit', ownerHelp:'Your position updates in real time for everyone in this session.', endSession:'End session', locked:'Position locked', sessionEnded:'Session ended',
         viewerTitle:'Viewer', viewerTitleEn:'Người xem', sessActive:'Session active', sessExpiring:'Session expiring soon', ownerReady:'Owner pinned a location', ownerWaiting:'Owner has not set a position yet…', pick:'Choose my location', picking:'Click the map…', useGps:'Use GPS location', findRoute:'Get directions', clearRoute:'Clear route', distance:'Estimated distance', hops:'points on route', pickHint:'Click the map to set your start point.',
-        errNoOwner:'Owner has not set a position.', errNoViewer:'Choose your start location first.', errNoGraph:'The map needs at least 2 connected nodes.', errNoPath:'No route found between the two points.', needOwnerPos:'Set the owner position first.', viewerOpened:'Viewer tab opened', demoReady:'Demo ready — draw roads & open the viewer link', pickHint2:'', nodeOnEdge:'Node inserted onto the existing edge', undo:'Undo', redo:'Redo', toolPen:'Pen (draw roads)', penHint:'Draw continuous roads by clicking', penOn:'Active — click to turn off', penHelp:'Click the map to start drawing. Each click adds a node and links it to the previous one.', penContinue:'Keep clicking to extend the road · click the last point (or Esc) to finish.', saveMap:'Save map', loadMap:'Load map', mapSaved:'Map saved to a JSON file', mapLoaded:'Map loaded from file', badFile:'Invalid file', copyFail:'Link selected — press Ctrl/Cmd+C to copy', storageFull:'Image too large to sync across tabs.', gpsUnavailable:'Map is not georeferenced, GPS unavailable — pick manually.',
+        errNoOwner:'Owner has not set a position.', errNoViewer:'Choose your start location first.', errNoGraph:'The map needs at least 2 connected nodes.', errNoPath:'No route found between the two points.', needOwnerPos:'Set the owner position first.', viewerOpened:'Viewer tab opened', demoReady:'Demo ready — draw roads & open the viewer link', pickHint2:'', nodeOnEdge:'Node inserted onto the existing edge', undo:'Undo', redo:'Redo', toolPen:'Pen (draw roads)', penHint:'Draw continuous roads by clicking', penOn:'Active — click to turn off', penHelp:'Click the map to start drawing. Each click adds a node and links it to the previous one.', penContinue:'Keep clicking to extend the road · click the last point (or Esc) to finish.', saveMap:'Save map', loadMap:'Load map', mapSaved:'Map saved to a JSON file', mapLoaded:'Map loaded from file', badFile:'Invalid file', copyFail:'Link selected — press Ctrl/Cmd+C to copy', storageFull:'Image too large to sync across tabs.', syncFail:'Could not save the session to the server — check your connection and retry.', gpsUnavailable:'Map is not georeferenced, GPS unavailable — pick manually.',
         loadingTitle:'Loading session…', loadingMsg:'Fetching session data from the server, please wait.',
         notfoundTitle:'Session not found', notfoundMsg:'The link is invalid or the session was deleted.', expiredTitle:'Session expired', expiredMsg:'This session is past its lifetime and can no longer be accessed.', deniedTitle:'Access denied', deniedMsg:'Invalid admin token. You cannot edit this session.', endedTitle:'Session ended', endedMsg:'The owner has ended this session.',
         expNever:'Never', min15:'15 minutes', min60:'1 hour', min240:'4 hours', min1440:'24 hours', mapClickAdd:'Click to add nodes · drag to pan', mapDragOwner:'Click / drag to set your position', mapPickViewer:'Click the map to set your start point', mapPan:'Drag to pan · scroll to zoom' },

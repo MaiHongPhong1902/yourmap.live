@@ -561,7 +561,7 @@ class Component extends DCLogic {
     const next = Object.assign(cur, patch);
     try{ localStorage.setItem(this._key(t), JSON.stringify(next)); }catch(e){ this._toast(this.L().storageFull); }
   }
-  _saveGraph(){ this._save({ nodes: this.state.nodes, edges: this.state.edges }); this._send({type:'graph', nodes:this.state.nodes, edges:this.state.edges}); this._pushHist(); }
+  _saveGraph(){ this._save({ nodes: this.state.nodes, edges: this.state.edges }); this._send({type:'graph', nodes:this.state.nodes, edges:this.state.edges}); this._pushServer({ nodes:this.state.nodes, edges:this.state.edges }); this._pushHist(); }
   // ---- undo / redo history (instance-based so it is immune to React batching) ----
   _snap(n, e){ return { nodes: JSON.parse(JSON.stringify(n||[])), edges: JSON.parse(JSON.stringify(e||[])) }; }
   _pushHist(){
@@ -579,11 +579,12 @@ class Component extends DCLogic {
     this.setState({ nodes:c.nodes, edges:c.edges, histIdx:this.hptr, histLen:this.hist.length, selNode:null, selEdge:null, connectFrom:null, route:null, searchSegs:[] });
     this._save({ nodes:c.nodes, edges:c.edges });
     this._send({type:'graph', nodes:c.nodes, edges:c.edges});
+    this._pushServer({ nodes:c.nodes, edges:c.edges });
   }
   undo(){ if(this.hptr > 0){ this.hptr--; this._applyHist(); } }
   redo(){ if(this.hptr < this.hist.length - 1){ this.hptr++; this._applyHist(); } }
   _resetHist(n, e){ this.hist = [this._snap(n||[], e||[])]; this.hptr = 0; this.setState({ histIdx:0, histLen:1 }); }
-  _saveOwner(){ this._save({ ownerPos: this.state.ownerPos, ownerLocked: this.state.ownerLocked }); this._send({type:'owner', pos:this.state.ownerPos, locked:this.state.ownerLocked}); }
+  _saveOwner(){ this._save({ ownerPos: this.state.ownerPos, ownerLocked: this.state.ownerLocked }); this._send({type:'owner', pos:this.state.ownerPos, locked:this.state.ownerLocked}); this._pushServer({ ownerPos:this.state.ownerPos, ownerLocked:this.state.ownerLocked }); }
 
   /* crypto-ish helpers */
   _rid(len){ const a = new Uint8Array(len); (crypto||window.crypto).getRandomValues(a); return Array.from(a, b => (b%36).toString(36)).join(''); }
@@ -593,6 +594,18 @@ class Component extends DCLogic {
     h1 = Math.imul(h1^(h1>>>16), 2246822507) ^ Math.imul(h2^(h2>>>13), 3266489909);
     h2 = Math.imul(h2^(h2>>>16), 2246822507) ^ Math.imul(h1^(h1>>>13), 3266489909);
     return (4294967296*(2097151&h2)+(h1>>>0)).toString(16);
+  }
+
+  /* ---------------- đẩy thay đổi của chủ phiên lên server ----------------
+     WebSocket chỉ mở ở màn owner/graph/viewer; ở màn "tạo phiên" (create)
+     chưa có WS nên chỉnh sửa sẽ không được server lưu. Khi đó re-POST lại
+     toàn bộ phiên (POST = upsert) để người xem tải về luôn thấy bản mới nhất. */
+  _pushServer(patch){
+    if(!(window.MSNet && window.MSNet.enabled)) return;
+    if(this.ws && this.ws.readyState === 1) return; // đang có WS → server tự lưu qua kênh realtime
+    if(!this._sessData) return; // chỉ client tạo phiên mới giữ bản đầy đủ
+    Object.assign(this._sessData, patch);
+    window.MSNet.create(this._sessData).catch(()=>{});
   }
 
   /* ---------------- nạp session từ server ---------------- */
@@ -1108,6 +1121,8 @@ class Component extends DCLogic {
     };
     try{ localStorage.setItem(this._key(token), JSON.stringify(sess)); }
     catch(err){ this._toast(this.L().storageFull); }
+    // Giữ bản đầy đủ để re-POST khi chủ phiên chỉnh sửa tiếp ở màn tạo phiên.
+    this._sessData = sess;
     // Đẩy lên server để thiết bị khác mở được link (bỏ qua nếu chạy offline/file://).
     if(window.MSNet && window.MSNet.enabled){ window.MSNet.create(sess).catch(()=>{}); }
     this.setState({ token, ownerToken, expiresAt, created:true }, cb);
@@ -1148,7 +1163,7 @@ class Component extends DCLogic {
 
   lockOwner(){ if(!this.state.ownerPos){ this._toast(this.L().needOwnerPos); return; } this.setState({ ownerLocked:true }, ()=>this._saveOwner()); this._toast(this.L().locked); }
   unlockOwner(){ this.setState({ ownerLocked:false }, ()=>this._saveOwner()); }
-  endSession(){ this._save({ status:'ended' }); this._send({type:'end'}); this._toast(this.L().sessionEnded); this.setState({ screen:'ended' }); }
+  endSession(){ this._save({ status:'ended' }); this._send({type:'end'}); this._pushServer({ status:'ended' }); this._toast(this.L().sessionEnded); this.setState({ screen:'ended' }); }
   startPickViewer(){ this.setState({ picking:true }); this._toast(this.L().pickHint); }
   useGps(){ this._toast(this.L().gpsUnavailable); }
   _drawQR(text){

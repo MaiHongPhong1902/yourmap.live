@@ -114,7 +114,15 @@ app.get('/api/health', (req, res) => {
 app.post('/api/sessions', (req, res) => {
   const sess = sanitizeIncomingSession(req.body);
   if (!sess) return res.status(400).json({ error: 'invalid session payload' });
+  const existed = !!store.get(sess.token);
   store.put(sess.token, sess);
+  // Nếu là cập nhật (chủ phiên chỉnh sửa lại ở màn tạo phiên), phát realtime
+  // cho người xem đang kết nối để họ thấy ngay đồ thị / vị trí mới nhất.
+  if (existed) {
+    broadcast(sess.token, { type: 'graph', nodes: sess.nodes, edges: sess.edges }, null);
+    broadcast(sess.token, { type: 'owner', pos: sess.ownerPos, locked: sess.ownerLocked }, null);
+    if (sess.status === 'ended') broadcast(sess.token, { type: 'end' }, null);
+  }
   res.status(201).json({ ok: true, token: sess.token });
 });
 

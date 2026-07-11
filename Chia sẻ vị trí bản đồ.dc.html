@@ -3,6 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- React runtime nạp cục bộ (đồng bộ, trước support.js) để app tự chạy trên
+     server, không phụ thuộc CDN unpkg mà support.js dùng mặc định (có thể bị
+     chặn/chậm ở một số mạng). Nếu 2 file này 404 (môi trường preview có sẵn
+     React), support.js sẽ tự quay về nạp từ unpkg như cũ. -->
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
 <script src="./support.js"></script>
 <script>
 /* ---- MSNet: lớp adapter nói chuyện với backend (REST + WebSocket) ----

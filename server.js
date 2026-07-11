@@ -161,6 +161,7 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
 // --- File tĩnh --------------------------------------------------------------
 app.get('/', (req, res) => res.sendFile(path.join(ROOT, HTML_FILE)));
 app.get('/support.js', (req, res) => res.sendFile(path.join(ROOT, 'support.js')));
+app.use('/vendor', express.static(path.join(ROOT, 'vendor'), { maxAge: '7d' }));
 app.use('/maps', express.static(path.join(ROOT, 'maps'), { maxAge: '1h' }));
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '1h' }));
 

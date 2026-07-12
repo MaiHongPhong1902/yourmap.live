@@ -257,7 +257,8 @@
           d.onclick = function(){
             var lat=parseFloat(it.lat), lng=parseFloat(it.lon);
             map.setView([lat,lng], 16);
-            L.marker([lat,lng]).addTo(map).bindPopup(it.display_name).openPopup();
+            var pop = document.createElement('div'); pop.textContent = it.display_name;
+            L.marker([lat,lng]).addTo(map).bindPopup(pop).openPopup();
             searchResults.innerHTML='';
           };
           searchResults.appendChild(d);

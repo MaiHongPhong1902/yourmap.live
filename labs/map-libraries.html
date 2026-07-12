@@ -214,7 +214,14 @@
     var c = map.getCenter(); var pt = meMarker ? meMarker.getLatLng() : c;
     var url = location.origin + location.pathname + '#loc=' + pt.lat.toFixed(6) + ',' + pt.lng.toFixed(6) + '&z=' + map.getZoom();
     var inp = document.getElementById('shareLink'); inp.style.display='block'; inp.value = url; inp.select();
-    try{ navigator.clipboard.writeText(url); toast('Đã sao chép link chia sẻ'); }catch(e){ toast('Link đã sẵn sàng — Ctrl/Cmd+C để chép'); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(
+        function(){ toast('Đã sao chép link chia sẻ'); },
+        function(){ toast('Link đã sẵn sàng — Ctrl/Cmd+C để chép'); }
+      );
+    } else {
+      toast('Link đã sẵn sàng — Ctrl/Cmd+C để chép');
+    }
     // QR (miễn phí, cùng lib với app chính)
     try{
       var qr = qrcode(0, 'M'); qr.addData(url); qr.make();

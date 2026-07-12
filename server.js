@@ -412,6 +412,8 @@ app.get('/support.js', (req, res) => res.sendFile(path.join(ROOT, 'support.js'))
 app.use('/vendor', express.static(path.join(ROOT, 'vendor'), { maxAge: '7d' }));
 app.use('/maps', express.static(path.join(ROOT, 'maps'), { maxAge: '1h' }));
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '1h' }));
+// Lab thử nghiệm thư viện bản đồ miễn phí (Leaflet + OSM + OSRM + Nominatim).
+app.use('/labs', express.static(path.join(ROOT, 'labs'), { maxAge: '5m' }));
 
 // Xử lý lỗi upload (multer) và lỗi chung.
 app.use((err, req, res, next) => {

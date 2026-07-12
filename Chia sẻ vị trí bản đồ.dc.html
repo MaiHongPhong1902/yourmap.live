@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chia sẻ vị trí bản đồ</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23dc2626'%3E%3Cpath d='M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z'/%3E%3C/svg%3E">
 <!-- React runtime nạp cục bộ (đồng bộ, trước support.js) để app tự chạy trên
      server, không phụ thuộc CDN unpkg mà support.js dùng mặc định (có thể bị
      chặn/chậm ở một số mạng). Nếu 2 file này 404 (môi trường preview có sẵn
@@ -80,7 +82,7 @@ window.MSNet = (function () {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="/vendor/qrcode.min.js"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
   body{font-family:'Be Vietnam Pro',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;color:#0f172a;-webkit-font-smoothing:antialiased;overflow:hidden;}
@@ -327,6 +329,10 @@ window.MSNet = (function () {
                 <select value="{{ expiryChoice }}" onChange="{{ onExpiry }}" style="{{ selectStyle }}">
                   <sc-for list="{{ expiryOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.v }}">{{ o.t }}</option></sc-for>
                 </select>
+                <sc-if value="{{ expiryCustom }}" hint-placeholder-val="{{ false }}">
+                  <label style="{{ fieldLabelStyle }}">{{ s.expiryDateLabel }}</label>
+                  <input type="datetime-local" value="{{ expiryDate }}" min="{{ minDateTime }}" onChange="{{ onExpiryDate }}" style="{{ inputStyle }}">
+                </sc-if>
                 <label style="display:flex;align-items:center;gap:10px;margin:16px 0 4px;cursor:pointer;font-size:.9rem;font-weight:600;">
                   <input type="checkbox" checked="{{ usePassword }}" onChange="{{ onTogglePw }}" style="width:17px;height:17px;accent-color:#dc2626;">{{ s.setPassword }}
                 </label>
@@ -637,7 +643,7 @@ class Component extends DCLogic {
       createTab:'map', aerialChosen:false,
       token:null, ownerToken:null, created:false,
       ownerPos:null, ownerLocked:false, ownerLive:false,
-      expiryChoice:'60', usePassword:false, password:'',
+      expiryChoice:'60', expiryDate:'', usePassword:false, password:'',
       viewerPos:null, picking:false, gpsSupported:false,
       route:null, routeDist:0, routeHops:0, routeError:null,
       searchSegs:[], searchStep:0,
@@ -896,7 +902,8 @@ class Component extends DCLogic {
     else if(s.expired){ statusLabel = vi?'Hết hạn':'Expired'; statusColor='#d97706'; }
     else { statusLabel = vi?'Đang hoạt động':'Active'; statusColor='#16a34a'; }
     const active = s.status!=='ended' && !s.expired;
-    const meta = s.viewers + (vi?' người xem · ':' viewers · ') + s.nodes + (vi?' điểm':' points');
+    let meta = s.viewers + (vi?' người xem · ':' viewers · ') + s.nodes + (vi?' điểm':' points');
+    meta += ' · ' + (s.expiresAt ? (vi?'hết hạn ':'expires ') + this._fmtDateTime(s.expiresAt) : (vi?'không hết hạn':'never expires'));
     return {
       token:s.token, name: s.name || (vi?'(không tên)':'(untitled)'),
       statusLabel, meta, active, inactive: !active,
@@ -1561,7 +1568,15 @@ class Component extends DCLogic {
     img.src = url;
   }
   clearOwner(){ this.setState({ ownerPos:null }); }
-  onExpiry(e){ this.setState({ expiryChoice:e.target.value }); }
+  onExpiry(e){
+    const v = e.target.value; const patch = { expiryChoice:v };
+    // Khi chọn "Ngày cụ thể" mà chưa có ngày → mặc định 24h tới cho tiện.
+    if(v==='custom' && !this.state.expiryDate){ patch.expiryDate = this._localDateTimeValue(Date.now()+24*60*60*1000); }
+    this.setState(patch);
+  }
+  onExpiryDate(e){ this.setState({ expiryDate:e.target.value }); }
+  _localDateTimeValue(ms){ const d=new Date(ms); const p=(n)=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes()); }
+  _fmtDateTime(ms){ try{ return new Date(ms).toLocaleString(this.state.lang==='vi'?'vi-VN':'en-US',{ day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit' }); }catch(e){ return ''; } }
   onTogglePw(e){ this.setState({ usePassword:e.target.checked }); }
   onPassword(e){ this.setState({ password:e.target.value }); }
 
@@ -1595,7 +1610,16 @@ class Component extends DCLogic {
   }
   generateLink(){
     if(!this.state.ownerPos){ this.setState({ createTab:'pos' }); this._toast(this.L().needOwnerPos); return; }
-    const min = parseInt(this.state.expiryChoice,10);
+    const L = this.L();
+    let min;
+    if(this.state.expiryChoice === 'custom'){
+      if(!this.state.expiryDate){ this._toast(L.errExpiryNeeded); return; }
+      const t = new Date(this.state.expiryDate).getTime();
+      if(!t || t <= Date.now()){ this._toast(L.errExpiryFuture); return; }
+      min = Math.max(1, Math.round((t - Date.now())/60000)); // quy đổi ngày cụ thể → số phút
+    } else {
+      min = parseInt(this.state.expiryChoice,10);
+    }
     const pw = this.state.usePassword && this.state.password ? this.state.password : null;
     this._createSession(min, pw);
   }
@@ -1657,7 +1681,7 @@ class Component extends DCLogic {
         errNoOwner:'Chủ phiên chưa đặt vị trí.', errNoViewer:'Hãy chọn vị trí bắt đầu của bạn trước.', errNoGraph:'Bản đồ chưa có đủ đường đi (cần ít nhất 2 điểm).', errNoPath:'Không tìm được đường nối giữa hai điểm.', needOwnerPos:'Hãy đặt vị trí chủ phiên trước.', viewerOpened:'Đã mở tab người xem', demoReady:'Demo sẵn sàng — vẽ đường rồi bấm "Tạo đường link chia sẻ" để lưu & chia sẻ', pickHint2:'', nodeOnEdge:'Đã chèn điểm vào đoạn đường có sẵn', undo:'Hoàn tác', redo:'Làm lại', toolPen:'Bút vẽ đường', penHint:'Vẽ đường liền mạch bằng cách nhấn nối tiếp', penOn:'Đang bật — nhấn để tắt', penHelp:'Nhấn lên bản đồ để bắt đầu vẽ. Mỗi lần nhấn thêm một điểm và tự nối với điểm trước.', penContinue:'Nhấn tiếp để kéo dài đường · nhấn lại điểm cuối (hoặc Esc) để kết thúc nét.', saveMap:'Lưu bản đồ', loadMap:'Tải bản đồ', mapSaved:'Đã lưu bản đồ ra file JSON', mapLoaded:'Đã tải bản đồ từ file', badFile:'File không hợp lệ', copyFail:'Link đã được bôi chọn — nhấn Ctrl/Cmd+C để sao chép', storageFull:'Ảnh quá lớn để đồng bộ giữa các tab.', syncFail:'Không lưu được phiên lên máy chủ — kiểm tra kết nối rồi thử lại.', gpsUnavailable:'Ảnh bản đồ chưa được georeference nên GPS không khả dụng — hãy chọn thủ công.',
         loadingTitle:'Đang tải phiên…', loadingMsg:'Đang lấy dữ liệu phiên từ máy chủ, vui lòng đợi.',
         notfoundTitle:'Không tìm thấy phiên', notfoundMsg:'Đường link không hợp lệ hoặc phiên đã bị xóa.', expiredTitle:'Phiên đã hết hạn', expiredMsg:'Phiên này đã quá thời gian hoạt động và không còn truy cập được.', deniedTitle:'Không có quyền', deniedMsg:'Token quản trị không hợp lệ. Bạn không có quyền chỉnh sửa phiên này.', endedTitle:'Phiên đã kết thúc', endedMsg:'Chủ phiên đã kết thúc phiên này.',
-        expNever:'Không hết hạn', min15:'15 phút', min60:'1 giờ', min240:'4 giờ', min1440:'24 giờ', mapClickAdd:'Nhấn để thêm điểm · kéo để di chuyển bản đồ', mapDragOwner:'Nhấn / kéo để đặt vị trí của bạn', mapPickViewer:'Nhấn lên bản đồ để chọn điểm bắt đầu', mapPan:'Kéo để di chuyển · lăn chuột để phóng to' },
+        expNever:'Không hết hạn', min15:'15 phút', min60:'1 giờ', min240:'4 giờ', min1440:'24 giờ', min10080:'7 ngày', min43200:'30 ngày', expCustom:'Ngày cụ thể…', expiryDateLabel:'Chọn ngày & giờ hết hạn', errExpiryFuture:'Ngày hết hạn phải ở tương lai.', errExpiryNeeded:'Hãy chọn ngày hết hạn.', expiresOn:'Hết hạn', mapClickAdd:'Nhấn để thêm điểm · kéo để di chuyển bản đồ', mapDragOwner:'Nhấn / kéo để đặt vị trí của bạn', mapPickViewer:'Nhấn lên bản đồ để chọn điểm bắt đầu', mapPan:'Kéo để di chuyển · lăn chuột để phóng to' },
       en:{ tagline:'Private map · real-time', homeTitle:'Share your location on', homeTitleAccent:'your own map', homeSub:'Create a private map session from any image, draw the roads, pin a location and share via a link. Viewers pick their own start point and get instant directions.', createBtn:'Create session', demoBtn:'Quick demo', homeNote:'A private link is not absolute security — anyone with the link can view the session. Data is stored in this browser and synced across tabs sharing the same link.', backHome:'Back home',
         createTitle:'Create a map session', createTitleEn:'Tạo phiên bản đồ', stepMap:'Map', stepPos:'Position', stepGraph:'Roads', stepShare:'Share',
         stepMapDesc:'Choose a background map image. Use the sample or upload your own (PNG/JPG/WebP).', sampleMap:'Sample (aerial)', or:'or', uploadMap:'Upload your map image',
@@ -1670,7 +1694,7 @@ class Component extends DCLogic {
         errNoOwner:'Owner has not set a position.', errNoViewer:'Choose your start location first.', errNoGraph:'The map needs at least 2 connected nodes.', errNoPath:'No route found between the two points.', needOwnerPos:'Set the owner position first.', viewerOpened:'Viewer tab opened', demoReady:'Demo ready — draw roads, then hit "Create share link" to save & share', pickHint2:'', nodeOnEdge:'Node inserted onto the existing edge', undo:'Undo', redo:'Redo', toolPen:'Pen (draw roads)', penHint:'Draw continuous roads by clicking', penOn:'Active — click to turn off', penHelp:'Click the map to start drawing. Each click adds a node and links it to the previous one.', penContinue:'Keep clicking to extend the road · click the last point (or Esc) to finish.', saveMap:'Save map', loadMap:'Load map', mapSaved:'Map saved to a JSON file', mapLoaded:'Map loaded from file', badFile:'Invalid file', copyFail:'Link selected — press Ctrl/Cmd+C to copy', storageFull:'Image too large to sync across tabs.', syncFail:'Could not save the session to the server — check your connection and retry.', gpsUnavailable:'Map is not georeferenced, GPS unavailable — pick manually.',
         loadingTitle:'Loading session…', loadingMsg:'Fetching session data from the server, please wait.',
         notfoundTitle:'Session not found', notfoundMsg:'The link is invalid or the session was deleted.', expiredTitle:'Session expired', expiredMsg:'This session is past its lifetime and can no longer be accessed.', deniedTitle:'Access denied', deniedMsg:'Invalid admin token. You cannot edit this session.', endedTitle:'Session ended', endedMsg:'The owner has ended this session.',
-        expNever:'Never', min15:'15 minutes', min60:'1 hour', min240:'4 hours', min1440:'24 hours', mapClickAdd:'Click to add nodes · drag to pan', mapDragOwner:'Click / drag to set your position', mapPickViewer:'Click the map to set your start point', mapPan:'Drag to pan · scroll to zoom' },
+        expNever:'Never', min15:'15 minutes', min60:'1 hour', min240:'4 hours', min1440:'24 hours', min10080:'7 days', min43200:'30 days', expCustom:'Specific date…', expiryDateLabel:'Pick expiry date & time', errExpiryFuture:'Expiry must be in the future.', errExpiryNeeded:'Please pick an expiry date.', expiresOn:'Expires', mapClickAdd:'Click to add nodes · drag to pan', mapDragOwner:'Click / drag to set your position', mapPickViewer:'Click the map to set your start point', mapPan:'Drag to pan · scroll to zoom' },
     };
     return D[this.state.lang];
   }
@@ -1778,7 +1802,7 @@ class Component extends DCLogic {
     });
 
     // expiry options
-    const expiryOptions = [['0',s.expNever],['15',s.min15],['60',s.min60],['240',s.min240],['1440',s.min1440]];
+    const expiryOptions = [['0',s.expNever],['15',s.min15],['60',s.min60],['240',s.min240],['1440',s.min1440],['10080',s.min10080],['43200',s.min43200],['custom',s.expCustom]];
 
     // ---- graph tools block (React element, reused in create+graph) ----
     const graphToolsBlock = this._graphTools(s, editingGraph);
@@ -1881,6 +1905,7 @@ class Component extends DCLogic {
       graphToolsBlock,
       notCreated: !st.created, created: st.created,
       expiryChoice:st.expiryChoice, onExpiry:(e)=>this.onExpiry(e), expiryOptions:expiryOptions.map(([v,t])=>({v,t})),
+      expiryCustom: st.expiryChoice==='custom', expiryDate: st.expiryDate, onExpiryDate:(e)=>this.onExpiryDate(e), minDateTime: this._localDateTimeValue(st.now),
       usePassword:st.usePassword, onTogglePw:(e)=>this.onTogglePw(e), password:st.password, onPassword:(e)=>this.onPassword(e),
       generateLink:()=>this.generateLink(),
       qrRef:this.qrRef,

@@ -58,7 +58,7 @@ const PRUNE_GRACE_MS = 24 * 60 * 60 * 1000;   // giữ 24h sau khi hết hạn
 const MAX_NODES = 5000;
 const MAX_EDGES = 20000;
 const MAX_LABELS = 2000;
-const MAX_MAPIMAGE_LEN = 4_000_000; // ~4MB cho data URL dự phòng (nằm trong giới hạn JSON 16MB)
+const MAX_MAPIMAGE_LEN = 14_000_000; // ~14MB ký tự — đủ cho data URL (ảnh nhúng khi "Tải bản đồ"/fallback upload), khớp giới hạn JSON 20MB & hạn upload 10MB
 const WS_MAX_PAYLOAD = 2 * 1024 * 1024; // 2MB mỗi message WebSocket
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -204,7 +204,7 @@ function publicUser(u) { return u ? { id: u.id, username: u.username } : null; }
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', true); // sau nginx: đọc đúng X-Forwarded-Proto
-app.use(express.json({ limit: '16mb' })); // đủ chỗ cho mapImage dạng data URL (fallback)
+app.use(express.json({ limit: '20mb' })); // đủ chỗ cho mapImage dạng data URL (fallback upload / ảnh nhúng khi "Tải bản đồ")
 
 // Upload ảnh bản đồ ------------------------------------------------------------
 const upload = multer({

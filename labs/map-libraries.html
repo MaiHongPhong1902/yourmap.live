@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
+<title>Lab bản đồ miễn phí · Leaflet + OSM + OSRM + Nominatim</title>
+
+<!-- Leaflet (miễn phí, MIT) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<!-- Leaflet-Geoman (vẽ/chỉnh sửa, miễn phí) -->
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.20.0/dist/leaflet-geoman.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.20.0/dist/leaflet-geoman.min.js"></script>
+<!-- QR (đã dùng trong app chính) -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+
+<style>
+  :root{ --red:#dc2626; --ink:#0f172a; --slate:#475569; --line:#e2e8f0; --bg:#f8fafc; }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
+  body{font-family:'Be Vietnam Pro',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:var(--ink);}
+  #map{position:absolute;inset:0;z-index:0;background:#e5e7eb;}
+
+  /* Bảng điều khiển nổi */
+  .panel{position:absolute;top:12px;left:12px;z-index:1000;width:320px;max-width:calc(100vw - 24px);
+    background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border:1px solid var(--line);
+    border-radius:16px;box-shadow:0 10px 30px rgba(15,23,42,.18);overflow:hidden;}
+  .panel__head{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--line);cursor:pointer;}
+  .logo{width:32px;height:32px;border-radius:9px;flex:none;background:linear-gradient(135deg,var(--red),var(--slate));
+    display:grid;place-items:center;box-shadow:0 4px 12px rgba(220,38,38,.28);}
+  .panel__title{font-weight:800;font-size:.98rem;line-height:1.15;}
+  .panel__title small{display:block;font-size:.66rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;}
+  .panel__toggle{margin-left:auto;color:#94a3b8;font-size:1.1rem;transition:transform .25s;}
+  .panel.collapsed .panel__toggle{transform:rotate(-90deg);}
+  .panel__body{max-height:calc(100vh - 110px);overflow-y:auto;padding:13px 15px 16px;display:flex;flex-direction:column;gap:14px;transition:max-height .3s,padding .3s,opacity .2s;}
+  .panel.collapsed .panel__body{max-height:0;padding-top:0;padding-bottom:0;opacity:0;}
+
+  .sec__label{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin-bottom:7px;}
+  .row{display:flex;gap:7px;}
+  .btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 11px;border-radius:10px;
+    border:1.5px solid var(--line);background:#fff;color:var(--ink);font-weight:700;font-size:.82rem;cursor:pointer;font-family:inherit;transition:.15s;}
+  .btn:hover{border-color:#cbd5e1;background:#f8fafc;}
+  .btn--red{background:var(--red);border-color:var(--red);color:#fff;box-shadow:0 6px 16px rgba(220,38,38,.3);}
+  .btn--red:hover{background:#b91c1c;}
+  .btn--on{background:#eff6ff;border-color:#bfdbfe;color:#2563eb;}
+  .btn svg{width:15px;height:15px;flex:none;}
+  input[type=text]{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:.86rem;font-family:inherit;}
+  input[type=text]:focus{outline:none;border-color:var(--red);}
+  .search__results{margin-top:6px;display:flex;flex-direction:column;gap:2px;max-height:180px;overflow-y:auto;}
+  .search__item{padding:8px 10px;border-radius:8px;font-size:.8rem;color:var(--slate);cursor:pointer;line-height:1.3;}
+  .search__item:hover{background:#f1f5f9;color:var(--ink);}
+  .stat{background:#f8fafc;border:1px solid var(--line);border-radius:11px;padding:11px 13px;font-size:.82rem;line-height:1.5;color:var(--slate);}
+  .stat b{color:var(--ink);}
+  .stat--route{background:#fef2f2;border-color:#fecaca;color:#991b1b;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .chip{padding:6px 10px;border-radius:999px;border:1.5px solid var(--line);background:#fff;font-size:.76rem;font-weight:700;cursor:pointer;}
+  .chip.active{border-color:var(--red);color:var(--red);background:#fff5f5;}
+  .hint{font-size:.74rem;color:#94a3b8;line-height:1.5;}
+  a{color:var(--red);}
+  .share__link{width:100%;font-family:ui-monospace,monospace;font-size:.72rem;background:#f8fafc;border:1px solid var(--line);border-radius:9px;padding:8px 10px;color:var(--slate);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;user-select:all;}
+  #qr{margin-top:9px;display:none;}
+  #qr img,#qr canvas,#qr table{margin:0 auto;}
+  .toast{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);z-index:1200;background:rgba(15,23,42,.92);color:#fff;
+    font-size:.84rem;font-weight:600;padding:10px 18px;border-radius:999px;box-shadow:0 8px 22px rgba(0,0,0,.3);opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+  .toast.show{opacity:1;}
+  .leaflet-container{font-family:inherit;}
+  @media (max-width:520px){ .panel{width:calc(100vw - 24px);} }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="panel" id="panel">
+  <div class="panel__head" id="panelHead">
+    <span class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+    <span class="panel__title">Lab bản đồ miễn phí<small>Leaflet · OSM · OSRM · Nominatim</small></span>
+    <span class="panel__toggle" id="panelToggle">▾</span>
+  </div>
+  <div class="panel__body">
+
+    <!-- Lớp nền -->
+    <div class="sec">
+      <div class="sec__label">Lớp nền (đều miễn phí)</div>
+      <div class="chips" id="baseChips"></div>
+    </div>
+
+    <!-- Vị trí của tôi -->
+    <div class="sec">
+      <div class="sec__label">Chia sẻ vị trí (GPS · miễn phí)</div>
+      <div class="row">
+        <button class="btn btn--red" id="btnLocate">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>
+          Vị trí của tôi
+        </button>
+        <button class="btn" id="btnWatch" title="Theo dõi liên tục">Theo dõi</button>
+      </div>
+      <div class="row" style="margin-top:7px;">
+        <button class="btn" id="btnShare">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+          Tạo link chia sẻ vị trí
+        </button>
+      </div>
+      <input type="text" id="shareLink" class="share__link" readonly style="display:none;margin-top:7px;">
+      <div id="qr"></div>
+    </div>
+
+    <!-- Tìm địa chỉ -->
+    <div class="sec">
+      <div class="sec__label">Tìm địa chỉ (Nominatim · miễn phí)</div>
+      <form id="searchForm" autocomplete="off">
+        <input type="text" id="searchInput" placeholder="Nhập địa chỉ, ví dụ: Chợ Bến Thành…">
+      </form>
+      <div class="search__results" id="searchResults"></div>
+    </div>
+
+    <!-- Định tuyến -->
+    <div class="sec">
+      <div class="sec__label">Chỉ đường (OSRM · miễn phí)</div>
+      <div class="row">
+        <button class="btn" id="btnRoute">Đặt điểm A → B</button>
+        <button class="btn" id="btnClearRoute">Xóa</button>
+      </div>
+      <div class="stat stat--route" id="routeInfo" style="display:none;"></div>
+      <div class="hint" style="margin-top:6px;">Bấm “Đặt điểm A → B” rồi nhấn 2 điểm trên bản đồ (hoặc dùng vị trí GPS làm điểm A).</div>
+    </div>
+
+    <!-- Vẽ -->
+    <div class="sec">
+      <div class="sec__label">Vẽ / đo (Leaflet-Geoman · miễn phí)</div>
+      <div class="hint">Dùng thanh công cụ vẽ ở góc phải: vẽ đường, khu vực, điểm; kéo để chỉnh. Độ dài/diện tích hiện bên dưới.</div>
+      <div class="stat" id="measureInfo" style="display:none;margin-top:8px;"></div>
+    </div>
+
+    <div class="hint">Tất cả dịch vụ ở đây <b>không cần API key</b>. Máy chủ OSRM/Nominatim công cộng chỉ dùng cho thử nghiệm (giới hạn tần suất). Xem <code>docs/MAP-LIBRARIES.md</code>.</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  'use strict';
+  var HCM = [10.7769, 106.7009]; // TP.HCM làm mặc định
+
+  // ---- Lớp nền miễn phí (đã kiểm tra 200, không cần key) ----
+  var OSM_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+  var bases = {
+    'Đường phố': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution: OSM_ATTR + ' contributors' }),
+    'Sáng (Carto)': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom:20, subdomains:'abcd', attribution: OSM_ATTR + ' · © <a href="https://carto.com/attributions">CARTO</a>' }),
+    'Tối (Carto)': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:20, subdomains:'abcd', attribution: OSM_ATTR + ' · © CARTO' }),
+    'Vệ tinh (Esri)': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution: 'Tiles © Esri, Maxar, Earthstar Geographics' }),
+    'Địa hình': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom:17, attribution: OSM_ATTR + ' · © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)' })
+  };
+  var baseNames = Object.keys(bases);
+
+  var map = L.map('map', { zoomControl:true, layers:[ bases['Đường phố'] ] }).setView(HCM, 13);
+  L.control.scale({ imperial:false }).addTo(map);
+
+  // Chips chọn lớp nền
+  var chipsEl = document.getElementById('baseChips');
+  var activeBase = bases['Đường phố'];
+  baseNames.forEach(function(name){
+    var c = document.createElement('button');
+    c.className = 'chip' + (name==='Đường phố'?' active':'');
+    c.textContent = name;
+    c.onclick = function(){
+      if(bases[name]===activeBase) return;
+      map.removeLayer(activeBase); activeBase = bases[name]; map.addLayer(activeBase);
+      Array.prototype.forEach.call(chipsEl.children, function(x){ x.classList.remove('active'); });
+      c.classList.add('active');
+    };
+    chipsEl.appendChild(c);
+  });
+
+  // ---- Toast ----
+  var toastEl = document.getElementById('toast'), toastT;
+  function toast(msg){ toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(function(){ toastEl.classList.remove('show'); }, 2600); }
+
+  // ---- Panel thu gọn (mobile) ----
+  var panel = document.getElementById('panel');
+  document.getElementById('panelHead').onclick = function(){ panel.classList.toggle('collapsed'); };
+  if(window.matchMedia('(max-width:520px)').matches) panel.classList.add('collapsed');
+
+  // ================= GPS: vị trí của tôi =================
+  var meMarker=null, meCircle=null, watchId=null;
+  function showMe(lat, lng, acc){
+    var ll = [lat,lng];
+    if(!meMarker){
+      meMarker = L.marker(ll, { title:'Vị trí của tôi' }).addTo(map).bindPopup('Vị trí của tôi');
+      meCircle = L.circle(ll, { radius: acc||30, color:'#2563eb', weight:1, fillColor:'#3b82f6', fillOpacity:.15 }).addTo(map);
+    } else { meMarker.setLatLng(ll); meCircle.setLatLng(ll).setRadius(acc||30); }
+  }
+  document.getElementById('btnLocate').onclick = function(){
+    if(!navigator.geolocation){ toast('Trình duyệt không hỗ trợ GPS'); return; }
+    toast('Đang lấy vị trí…');
+    navigator.geolocation.getCurrentPosition(function(p){
+      showMe(p.coords.latitude, p.coords.longitude, p.coords.accuracy);
+      map.setView([p.coords.latitude, p.coords.longitude], 16);
+      toast('Đã lấy vị trí (±' + Math.round(p.coords.accuracy) + 'm)');
+    }, function(err){ toast('Không lấy được vị trí: ' + err.message); }, { enableHighAccuracy:true, timeout:10000, maximumAge:0 });
+  };
+  document.getElementById('btnWatch').onclick = function(){
+    var btn = this;
+    if(watchId!=null){ navigator.geolocation.clearWatch(watchId); watchId=null; btn.classList.remove('btn--on'); btn.textContent='Theo dõi'; toast('Đã tắt theo dõi'); return; }
+    if(!navigator.geolocation){ toast('Trình duyệt không hỗ trợ GPS'); return; }
+    watchId = navigator.geolocation.watchPosition(function(p){ showMe(p.coords.latitude, p.coords.longitude, p.coords.accuracy); }, function(err){ toast('Lỗi theo dõi: '+err.message); }, { enableHighAccuracy:true, maximumAge:2000, timeout:12000 });
+    btn.classList.add('btn--on'); btn.textContent='Đang theo dõi'; toast('Đang theo dõi vị trí realtime');
+  };
+
+  // ================= Chia sẻ vị trí qua link + QR =================
+  document.getElementById('btnShare').onclick = function(){
+    var c = map.getCenter(); var pt = meMarker ? meMarker.getLatLng() : c;
+    var url = location.origin + location.pathname + '#loc=' + pt.lat.toFixed(6) + ',' + pt.lng.toFixed(6) + '&z=' + map.getZoom();
+    var inp = document.getElementById('shareLink'); inp.style.display='block'; inp.value = url; inp.select();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(
+        function(){ toast('Đã sao chép link chia sẻ'); },
+        function(){ toast('Link đã sẵn sàng — Ctrl/Cmd+C để chép'); }
+      );
+    } else {
+      toast('Link đã sẵn sàng — Ctrl/Cmd+C để chép');
+    }
+    // QR (miễn phí, cùng lib với app chính)
+    try{
+      var qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+      document.getElementById('qr').style.display='block';
+      document.getElementById('qr').innerHTML = qr.createImgTag(4, 8);
+    }catch(e){}
+  };
+  // Đọc link chia sẻ khi mở trang
+  (function readShared(){
+    var h = location.hash.replace(/^#/, ''); if(!h) return;
+    var m = /loc=(-?\d+\.?\d*),(-?\d+\.?\d*)/.exec(h); var z = /z=(\d+)/.exec(h);
+    if(m){ var lat=parseFloat(m[1]), lng=parseFloat(m[2]);
+      L.marker([lat,lng]).addTo(map).bindPopup('📍 Vị trí được chia sẻ').openPopup();
+      map.setView([lat,lng], z?parseInt(z[1],10):16);
+    }
+  })();
+
+  // ================= Tìm địa chỉ (Nominatim) =================
+  var searchResults = document.getElementById('searchResults');
+  var lastSearch = 0;
+  document.getElementById('searchForm').onsubmit = function(e){
+    e.preventDefault();
+    var q = document.getElementById('searchInput').value.trim(); if(!q) return;
+    var now = Date.now(); if(now - lastSearch < 1100){ toast('Vui lòng chờ 1 giây (giới hạn Nominatim)'); return; } lastSearch = now;
+    searchResults.innerHTML = '<div class="search__item">Đang tìm…</div>';
+    fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=' + encodeURIComponent(q), { headers:{ 'Accept':'application/json' } })
+      .then(function(r){ return r.json(); })
+      .then(function(list){
+        searchResults.innerHTML = '';
+        if(!list.length){ searchResults.innerHTML = '<div class="search__item">Không tìm thấy.</div>'; return; }
+        list.forEach(function(it){
+          var d = document.createElement('div'); d.className='search__item'; d.textContent = it.display_name;
+          d.onclick = function(){
+            var lat=parseFloat(it.lat), lng=parseFloat(it.lon);
+            map.setView([lat,lng], 16);
+            var pop = document.createElement('div'); pop.textContent = it.display_name;
+            L.marker([lat,lng]).addTo(map).bindPopup(pop).openPopup();
+            searchResults.innerHTML='';
+          };
+          searchResults.appendChild(d);
+        });
+      }).catch(function(){ searchResults.innerHTML = '<div class="search__item">Lỗi tìm kiếm.</div>'; });
+  };
+
+  // ================= Định tuyến (OSRM public demo) =================
+  var routePts=[], routeLine=null, routeMarkers=[], routeMode=false;
+  var btnRoute = document.getElementById('btnRoute');
+  btnRoute.onclick = function(){
+    routeMode = !routeMode; btnRoute.classList.toggle('btn--on', routeMode);
+    btnRoute.textContent = routeMode ? 'Đang đặt điểm…' : 'Đặt điểm A → B';
+    if(routeMode){
+      // Nếu đã có vị trí GPS, dùng làm điểm A cho tiện.
+      if(meMarker && !routePts.length){ addRoutePoint(meMarker.getLatLng(), 'A (GPS)'); }
+      toast('Nhấn lên bản đồ để đặt điểm' + (routePts.length? ' B':' A'));
+    }
+  };
+  document.getElementById('btnClearRoute').onclick = clearRoute;
+  function clearRoute(){
+    routePts=[]; routeMode=false; btnRoute.classList.remove('btn--on'); btnRoute.textContent='Đặt điểm A → B';
+    if(routeLine){ map.removeLayer(routeLine); routeLine=null; }
+    routeMarkers.forEach(function(m){ map.removeLayer(m); }); routeMarkers=[];
+    document.getElementById('routeInfo').style.display='none';
+  }
+  function addRoutePoint(latlng, label){
+    routePts.push(latlng);
+    var m = L.marker(latlng, { title:label }).addTo(map).bindPopup(label); routeMarkers.push(m);
+    if(routePts.length===2){ requestRoute(); routeMode=false; btnRoute.classList.remove('btn--on'); btnRoute.textContent='Đặt điểm A → B'; }
+  }
+  map.on('click', function(e){
+    if(!routeMode) return;
+    if(routePts.length>=2) clearRoute();
+    addRoutePoint(e.latlng, routePts.length? 'B':'A');
+    if(routePts.length<2) toast('Nhấn tiếp để đặt điểm B');
+  });
+  function requestRoute(){
+    var a = routePts[0], b = routePts[1];
+    var url = 'https://router.project-osrm.org/route/v1/driving/' + a.lng+','+a.lat + ';' + b.lng+','+b.lat + '?overview=full&geometries=geojson';
+    document.getElementById('routeInfo').style.display='block';
+    document.getElementById('routeInfo').textContent = 'Đang tính đường…';
+    fetch(url).then(function(r){ return r.json(); }).then(function(res){
+      if(!res.routes || !res.routes.length){ document.getElementById('routeInfo').textContent='Không tìm được đường.'; return; }
+      var rt = res.routes[0];
+      var coords = rt.geometry.coordinates.map(function(c){ return [c[1], c[0]]; }); // [lon,lat]→[lat,lng]
+      if(routeLine) map.removeLayer(routeLine);
+      routeLine = L.polyline(coords, { color:'#dc2626', weight:5, opacity:.85 }).addTo(map);
+      map.fitBounds(routeLine.getBounds(), { padding:[60,60] });
+      var km = (rt.distance/1000).toFixed(2), mins = Math.round(rt.duration/60);
+      document.getElementById('routeInfo').innerHTML = '<b>'+km+' km</b> · khoảng <b>'+mins+' phút</b> (ô tô) — © OSRM';
+    }).catch(function(){ document.getElementById('routeInfo').textContent='Lỗi khi gọi OSRM.'; });
+  }
+
+  // ================= Vẽ / đo (Geoman) =================
+  if(map.pm){
+    map.pm.addControls({ position:'topright', drawMarker:true, drawPolyline:true, drawPolygon:true, drawCircle:false, drawRectangle:true, drawText:false, cutPolygon:false, rotateMode:false });
+    if (typeof map.pm.setLang === 'function') map.pm.setLang('vi'); // nếu không hỗ trợ sẽ giữ mặc định
+    function measure(layer){
+      var info = document.getElementById('measureInfo'); info.style.display='block';
+      if(layer instanceof L.Polygon){
+        var latlngs = layer.getLatLngs()[0]||[]; var area = geodesicArea(latlngs);
+        info.innerHTML = 'Khu vực: <b>' + fmtArea(area) + '</b>';
+      } else if(layer instanceof L.Polyline){
+        var pts = layer.getLatLngs(); var d=0; for(var i=1;i<pts.length;i++) d += pts[i-1].distanceTo(pts[i]);
+        info.innerHTML = 'Độ dài đường: <b>' + fmtLen(d) + '</b>';
+      } else if(layer instanceof L.Marker){
+        var ll = layer.getLatLng(); info.innerHTML = 'Điểm: <b>' + ll.lat.toFixed(5)+', '+ll.lng.toFixed(5) + '</b>';
+      }
+    }
+    map.on('pm:create', function(e){ measure(e.layer); if(e.layer.on) e.layer.on('pm:edit', function(){ measure(e.layer); }); });
+  }
+  function fmtLen(m){ return m>=1000 ? (m/1000).toFixed(2)+' km' : Math.round(m)+' m'; }
+  function fmtArea(a){ return a>=1e6 ? (a/1e6).toFixed(2)+' km²' : Math.round(a)+' m²'; }
+  // Diện tích trắc địa (xấp xỉ, đủ cho demo)
+  function geodesicArea(latLngs){
+    var R=6378137, area=0, len=latLngs.length; if(len<3) return 0;
+    for(var i=0;i<len;i++){ var p1=latLngs[i], p2=latLngs[(i+1)%len];
+      area += (p2.lng-p1.lng)*Math.PI/180 * (2 + Math.sin(p1.lat*Math.PI/180) + Math.sin(p2.lat*Math.PI/180)); }
+    return Math.abs(area * R * R / 2);
+  }
+})();
+</script>
+</body>
+</html>

@@ -107,10 +107,24 @@ hơn: các lệnh đặc quyền qua WebSocket (`owner` / `graph` / `end`) chỉ
 nhận từ kết nối có **owner token hợp lệ** (xác thực bằng cùng thuật toán băm
 `cyrb53` với frontend). Owner token nằm trong link chủ phiên — **giữ bí mật**.
 
+## Lab: bản đồ thật miễn phí (thử nghiệm)
+
+Ngoài chế độ ảnh tùy chỉnh hiện tại, dự án đang thử nghiệm **bản đồ thật** bằng các
+thư viện/dịch vụ **miễn phí, không cần API key**: Leaflet + OpenStreetMap/Carto/Esri
+(vệ tinh) + Geoman (vẽ) + OSRM (chỉ đường) + Nominatim (tìm địa chỉ) + Geolocation API (GPS).
+
+- Mở thử tại **`http://localhost:3000/labs/map-libraries.html`** (server đã có route `/labs`).
+  Demo: đổi lớp nền, lấy/gửi vị trí GPS + QR, tìm địa chỉ, chỉ đường A→B, vẽ & đo.
+- Đánh giá thư viện + lộ trình tích hợp vào app chính: xem **`docs/MAP-LIBRARIES.md`**.
+- ⚠️ Máy chủ công cộng OSRM/Nominatim chỉ dùng cho thử nghiệm (giới hạn tần suất);
+  GPS cần **HTTPS**.
+
 ## Cấu trúc
 
 ```
 server.js            # HTTP + REST + WebSocket + serve tĩnh
+labs/map-libraries.html         # Lab thử bản đồ thật miễn phí (Leaflet+OSM+OSRM+Nominatim)
+docs/MAP-LIBRARIES.md           # Đánh giá thư viện bản đồ miễn phí + lộ trình tích hợp
 lib/store.js         # Lưu phiên dạng file JSON (ghi atomic, dọn hết hạn)
 lib/hash.js          # cyrb53 — khớp chính xác hàm băm của frontend
 package.json

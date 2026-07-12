@@ -77,10 +77,9 @@ const authLimiter = new RateLimiter({ windowMs: 15 * 60 * 1000, max: 30 });
 // ----------------------------------------------------------------------------
 /** So sánh chuỗi kiểu constant-time để giảm rò rỉ thời gian. */
 function safeEqual(a, b) {
-  const ba = Buffer.from(String(a || ''), 'utf8');
-  const bb = Buffer.from(String(b || ''), 'utf8');
-  if (ba.length !== bb.length) return false;
-  try { return crypto.timingSafeEqual(ba, bb); } catch (e) { return false; }
+  const ha = crypto.createHash('sha256').update(String(a || ''), 'utf8').digest();
+  const hb = crypto.createHash('sha256').update(String(b || ''), 'utf8').digest();
+  return crypto.timingSafeEqual(ha, hb);
 }
 
 function isOwnerToken(session, ownerToken) {

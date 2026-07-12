@@ -1459,49 +1459,61 @@ class Component extends DCLogic {
     return null;
   }
   /**
-   * Tìm tuyến ngắn nhất theo TỔNG quãng đường, không chỉ dựa vào node gần nhất.
-   * Xét K node gần nhất quanh người xem làm điểm vào và K node gần nhất quanh
-   * chủ phiên làm điểm ra, rồi Dijkstra đa nguồn để chọn tổ hợp cho tổng
-   * (vào thẳng + đường trên graph + ra thẳng) nhỏ nhất. Node gần nhưng dẫn tới
-   * đường vòng dài hơn sẽ bị bỏ qua để ưu tiên tổng quãng đường ngắn hơn.
+   * Tìm tuyến ngắn nhất theo TỔNG quãng đường (vào thẳng + đường trên graph + ra thẳng),
+   * xét K node gần nhất quanh người xem (điểm VÀO) và quanh chủ phiên (điểm RA).
+   *
+   * Quy tắc phía người xem: điểm VÀO phải GẦN người xem — loại các điểm vào cách xa
+   * hơn 2× điểm gần nhất (dù tổng có ngắn hơn cũng coi là SAI). Trong số điểm vào hợp lệ,
+   * ưu tiên tổng quãng đường nhỏ nhất. Chỉ khi không điểm vào gần nào tới được đích mới
+   * nới ra toàn bộ ứng viên (giữ kết nối, tránh báo "không tìm thấy đường").
    */
   _bestRoute(vp, op){
     const nodes = this.state.nodes;
     if(nodes.length < 1) return null;
-    const K = 8; // số node ứng viên gần nhất xét cho điểm vào/ra
+    const K = 8;               // số node ứng viên gần nhất xét cho điểm vào/ra
+    const ENTRY_MAX_RATIO = 2; // điểm vào không được xa hơn 2× điểm gần nhất
     const nodeById = {}; nodes.forEach(n=>nodeById[n.id]=n);
     const nearestK = (pt)=> nodes.map(n=>({ id:n.id, d:this._dist(n, pt) })).sort((a,b)=>a.d-b.d).slice(0, K);
-    const startCands = nearestK(vp);
+    const startAll = nearestK(vp);
     const goalCands = {}; nearestK(op).forEach(c=>{ goalCands[c.id] = c.d; });
     const adj = this._adjacency();
-    const g = {}, came = {}, segs = [];
-    const open = new Set();
-    for(const c of startCands){ g[c.id] = c.d; open.add(c.id); } // chi phí vào = khoảng cách thẳng từ người xem
-    while(open.size){
-      let cur=null, cg=Infinity;
-      open.forEach(id=>{ if(g[id] < cg){ cg=g[id]; cur=id; } });
-      if(cur===null) break;
-      open.delete(cur);
-      for(const nb of (adj[cur]||[])){
-        const t = g[cur] + nb.w;
-        if(t < (g[nb.to]!=null?g[nb.to]:Infinity)){
-          came[nb.to]=cur; g[nb.to]=t; open.add(nb.to);
-          const a=nodeById[cur], b=nodeById[nb.to];
-          segs.push({ x1:a.xRatio*1000, y1:a.yRatio*this._vbH(), x2:b.xRatio*1000, y2:b.yRatio*this._vbH() });
+    // Ngưỡng "gần": chỉ giữ điểm vào cách ≤ 2× khoảng cách tới điểm gần nhất người xem.
+    const nearest = startAll.length ? startAll[0].d : 0;
+    const startNear = startAll.filter(c => c.d <= nearest * ENTRY_MAX_RATIO);
+
+    const run = (startCands)=>{
+      const g = {}, came = {}, segs = [];
+      const open = new Set();
+      for(const c of startCands){ g[c.id] = c.d; open.add(c.id); } // chi phí vào = khoảng cách thẳng từ người xem
+      while(open.size){
+        let cur=null, cg=Infinity;
+        open.forEach(id=>{ if(g[id] < cg){ cg=g[id]; cur=id; } });
+        if(cur===null) break;
+        open.delete(cur);
+        for(const nb of (adj[cur]||[])){
+          const t = g[cur] + nb.w;
+          if(t < (g[nb.to]!=null?g[nb.to]:Infinity)){
+            came[nb.to]=cur; g[nb.to]=t; open.add(nb.to);
+            const a=nodeById[cur], b=nodeById[nb.to];
+            segs.push({ x1:a.xRatio*1000, y1:a.yRatio*this._vbH(), x2:b.xRatio*1000, y2:b.yRatio*this._vbH() });
+          }
         }
       }
-    }
-    // điểm ra: chỉ so sánh trong các node gần chủ phiên → chọn tổng nhỏ nhất
-    let bestNode=null, bestTotal=Infinity;
-    for(const id in goalCands){
-      if(g[id]==null) continue;
-      const total = g[id] + goalCands[id];
-      if(total < bestTotal){ bestTotal=total; bestNode=id; }
-    }
-    if(bestNode===null) return null;
-    const path=[bestNode]; let cur=bestNode;
-    while(came[cur]!==undefined){ cur=came[cur]; path.unshift(cur); }
-    return { path, dist:bestTotal, segs };
+      // điểm ra: chỉ so sánh trong các node gần chủ phiên → chọn tổng nhỏ nhất
+      let bestNode=null, bestTotal=Infinity;
+      for(const id in goalCands){
+        if(g[id]==null) continue;
+        const total = g[id] + goalCands[id];
+        if(total < bestTotal){ bestTotal=total; bestNode=id; }
+      }
+      if(bestNode===null) return null;
+      const path=[bestNode]; let cur=bestNode;
+      while(came[cur]!==undefined){ cur=came[cur]; path.unshift(cur); }
+      return { path, dist:bestTotal, segs };
+    };
+
+    // Ưu tiên vào ở điểm gần; chỉ nới ra toàn bộ khi điểm gần không tới được đích.
+    return run(startNear) || run(startAll);
   }
   findRoute(){
     const L = this.L();

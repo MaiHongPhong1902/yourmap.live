@@ -316,7 +316,7 @@
   // ================= Vẽ / đo (Geoman) =================
   if(map.pm){
     map.pm.addControls({ position:'topright', drawMarker:true, drawPolyline:true, drawPolygon:true, drawCircle:false, drawRectangle:true, drawText:false, cutPolygon:false, rotateMode:false });
-    map.pm.setLang('vi'); // Geoman có sẵn tiếng Việt? nếu không sẽ giữ mặc định
+    if (typeof map.pm.setLang === 'function') map.pm.setLang('vi'); // nếu không hỗ trợ sẽ giữ mặc định
     function measure(layer){
       var info = document.getElementById('measureInfo'); info.style.display='block';
       if(layer instanceof L.Polygon){

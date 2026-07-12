@@ -310,9 +310,20 @@ app.patch('/api/sessions/:token/manage', (req, res) => {
   const patch = {};
   if (typeof req.body.name === 'string') patch.name = req.body.name.slice(0, 80);
   if (req.body.status === 'ended') patch.status = 'ended';
+  else if (req.body.status === 'active') patch.status = 'active'; // dùng lại phiên đã kết thúc
+  // Cho phép đặt/bỏ hạn khi dùng lại phiên.
+  if ('expiresAt' in req.body) {
+    patch.expiresAt = req.body.expiresAt == null ? null : (Number(req.body.expiresAt) || null);
+  }
+  // Kích hoạt lại mà phiên đã quá hạn và client không đặt hạn mới → bỏ hạn để dùng được ngay.
+  if (patch.status === 'active' && !('expiresAt' in req.body) &&
+      sess.expiresAt && Date.now() > sess.expiresAt) {
+    patch.expiresAt = null;
+  }
   const next = store.patch(req.params.token, patch);
   if (patch.status === 'ended') broadcast(req.params.token, { type: 'end' }, null);
-  res.json({ ok: true, name: next.name, status: next.status });
+  if (patch.status === 'active') broadcast(req.params.token, { type: 'reopen' }, null);
+  res.json({ ok: true, name: next.name, status: next.status, expiresAt: next.expiresAt });
 });
 
 app.delete('/api/sessions/:token', (req, res) => {

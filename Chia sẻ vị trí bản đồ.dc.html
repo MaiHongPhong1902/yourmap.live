@@ -772,12 +772,21 @@ class Component extends DCLogic {
 
   /* ---------------- storage ---------------- */
   _key(t){ return 'dus_sess_' + t; }
-  _load(t){ try{ const r = localStorage.getItem(this._key(t)); return r ? JSON.parse(r) : null; }catch(e){ return null; } }
+  // Cache trong RAM song song localStorage: phiên có ảnh nhúng lớn (data URL vài MB)
+  // dễ vượt quota localStorage; khi đó vẫn giữ được bản trong bộ nhớ để hiển thị,
+  // tránh lỗi "Không tìm thấy phiên" dù server vẫn có phiên.
+  _memGet(t){ return (this._mem && this._mem[t]) || null; }
+  _memSet(t, v){ this._mem = this._mem || {}; this._mem[t] = v; }
+  _load(t){
+    const m = this._memGet(t); if(m) return m;
+    try{ const r = localStorage.getItem(this._key(t)); return r ? JSON.parse(r) : null; }catch(e){ return null; }
+  }
   _save(patch){
     const t = this.state.token; if(!t) return;
     const cur = this._load(t) || {};
     const next = Object.assign(cur, patch);
-    try{ localStorage.setItem(this._key(t), JSON.stringify(next)); }catch(e){ this._toast(this.L().storageFull); }
+    this._memSet(t, next); // luôn giữ bản mới trong RAM (nguồn hiển thị chính)
+    try{ localStorage.setItem(this._key(t), JSON.stringify(next)); }catch(e){ /* quá lớn cho localStorage — vẫn dùng bản RAM */ }
   }
   _saveGraph(){ this._save({ nodes: this.state.nodes, edges: this.state.edges, labels: this.state.labels }); this._send({type:'graph', nodes:this.state.nodes, edges:this.state.edges, labels:this.state.labels}); this._pushServer({ nodes:this.state.nodes, edges:this.state.edges, labels:this.state.labels }); this._pushHist(); }
   // ---- undo / redo history (instance-based so it is immune to React batching) ----
@@ -926,6 +935,7 @@ class Component extends DCLogic {
     };
     window.MSNet.get(token, ot).then((sess)=>{
       if(sess && sess.token){
+        this._memSet(token, sess); // giữ RAM: phiên lớn vượt quota localStorage vẫn hiển thị được
         try{ localStorage.setItem(this._key(token), JSON.stringify(sess)); }catch(e){}
         this.route();
       } else { retryOrFail(); }
@@ -1612,6 +1622,7 @@ class Component extends DCLogic {
       createdAt:Date.now(), expiresAt, hasPassword: !!pw, passwordHash: pw?this._hash(pw):null,
       status:'active', name: this._defaultSessionName(),
     };
+    this._memSet(token, sess); // giữ RAM để phiên lớn (ảnh nhúng) vẫn hoạt động dù localStorage đầy
     try{ localStorage.setItem(this._key(token), JSON.stringify(sess)); }
     catch(err){ this._toast(this.L().storageFull); }
     // Giữ bản đầy đủ để re-POST khi chủ phiên chỉnh sửa tiếp ở màn tạo phiên.

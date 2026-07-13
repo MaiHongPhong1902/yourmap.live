@@ -276,7 +276,7 @@ window.MSNet = (function () {
             <p style="font-size:.8rem;color:#94a3b8;">{{ s.createTitleEn }}</p>
           </div>
           <!-- stepper -->
-          <div style="display:flex;gap:6px;padding:12px 16px;border-bottom:1px solid #eef2f7;overflow-x:auto;">
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px 16px;border-bottom:1px solid #eef2f7;">
             <sc-for list="{{ createSteps }}" as="st" hint-placeholder-count="4">
               <button onClick="{{ st.onClick }}" style="{{ st.style }}">
                 <span style="{{ st.numStyle }}">{{ st.num }}</span>{{ st.label }}
@@ -464,32 +464,32 @@ window.MSNet = (function () {
         <div ref="{{ vpRef }}" style="position:absolute;inset:0;cursor:{{ stageCursor }};touch-action:none;overflow:hidden;">
           <div ref="{{ worldRef }}" style="position:absolute;top:0;left:0;width:{{ worldW }}px;aspect-ratio:{{ worldAspect }};transform-origin:0 0;--z:1;will-change:transform;">
             <img ref="{{ imgRef }}" src="maps/aerial.jpg" alt="map" draggable="false" style="position:absolute;inset:0;width:100%;height:100%;user-select:none;pointer-events:none;border-radius:2px;">
-            <svg ref="{{ svgRef }}" viewBox="{{ viewBox }}" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;">
+            <svg ref="{{ svgRef }}" viewBox="0 0 1000 1000" data-dc-bind-view-box="{{ viewBox }}" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;">
               <defs>
                 <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0 0 L10 5 L0 10 z" fill="#dc2626"/></marker>
                 <marker id="arrowg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0 0 L10 5 L0 10 z" fill="#64748b"/></marker>
               </defs>
               <!-- base edges -->
               <sc-for list="{{ edgesView }}" as="e" hint-placeholder-count="0">
-                <line x1="{{ e.x1 }}" y1="{{ e.y1 }}" x2="{{ e.x2 }}" y2="{{ e.y2 }}" stroke="{{ e.color }}" stroke-width="{{ e.w }}" stroke-linecap="round" stroke-dasharray="{{ e.dash }}" marker-end="{{ e.marker }}" vector-effect="non-scaling-stroke" style="cursor:{{ e.cursor }};filter:{{ e.filter }};" onClick="{{ e.onClick }}"></line>
+                <line x1="0" y1="0" x2="0" y2="0" data-dc-bind-x1="{{ e.x1 }}" data-dc-bind-y1="{{ e.y1 }}" data-dc-bind-x2="{{ e.x2 }}" data-dc-bind-y2="{{ e.y2 }}" stroke="{{ e.color }}" stroke-width="{{ e.w }}" stroke-linecap="round" stroke-dasharray="{{ e.dash }}" marker-end="{{ e.marker }}" vector-effect="non-scaling-stroke" style="cursor:{{ e.cursor }};filter:{{ e.filter }};" onClick="{{ e.onClick }}"></line>
               </sc-for>
               <!-- search animation -->
               <sc-for list="{{ searchView }}" as="v" hint-placeholder-count="0">
-                <line x1="{{ v.x1 }}" y1="{{ v.y1 }}" x2="{{ v.x2 }}" y2="{{ v.y2 }}" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" vector-effect="non-scaling-stroke" style="animation:searchin .25s ease both;opacity:.85;"></line>
+                <line x1="0" y1="0" x2="0" y2="0" data-dc-bind-x1="{{ v.x1 }}" data-dc-bind-y1="{{ v.y1 }}" data-dc-bind-x2="{{ v.x2 }}" data-dc-bind-y2="{{ v.y2 }}" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" vector-effect="non-scaling-stroke" style="animation:searchin .25s ease both;opacity:.85;"></line>
               </sc-for>
               <!-- connectors -->
               <sc-for list="{{ connectorsView }}" as="c" hint-placeholder-count="0">
-                <line x1="{{ c.x1 }}" y1="{{ c.y1 }}" x2="{{ c.x2 }}" y2="{{ c.y2 }}" stroke="{{ c.color }}" stroke-width="2" stroke-dasharray="4 4" stroke-linecap="round" vector-effect="non-scaling-stroke"></line>
+                <line x1="0" y1="0" x2="0" y2="0" data-dc-bind-x1="{{ c.x1 }}" data-dc-bind-y1="{{ c.y1 }}" data-dc-bind-x2="{{ c.x2 }}" data-dc-bind-y2="{{ c.y2 }}" stroke="{{ c.color }}" stroke-width="2" stroke-dasharray="4 4" stroke-linecap="round" vector-effect="non-scaling-stroke"></line>
               </sc-for>
               <!-- route -->
               <sc-if value="{{ hasRoute }}" hint-placeholder-val="{{ false }}">
-                <polyline points="{{ routePts }}" fill="none" stroke="#dc2626" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" marker-mid="url(#arrow)" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));"></polyline>
-                <polyline points="{{ routePts }}" fill="none" stroke="#fca5a5" stroke-width="2" stroke-dasharray="6 10" stroke-linecap="round" vector-effect="non-scaling-stroke" style="animation:dashflow 1s linear infinite;"></polyline>
+                <polyline points="" data-dc-bind-points="{{ routePts }}" fill="none" stroke="#dc2626" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" marker-mid="url(#arrow)" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));"></polyline>
+                <polyline points="" data-dc-bind-points="{{ routePts }}" fill="none" stroke="#fca5a5" stroke-width="2" stroke-dasharray="6 10" stroke-linecap="round" vector-effect="non-scaling-stroke" style="animation:dashflow 1s linear infinite;"></polyline>
               </sc-if>
               <!-- nodes -->
               <sc-for list="{{ nodesView }}" as="n" hint-placeholder-count="0">
-                <circle cx="{{ n.cx }}" cy="{{ n.cy }}" r="16" fill="transparent" style="cursor:{{ n.cursor }};" onPointerDown="{{ n.onDown }}"></circle>
-                <circle cx="{{ n.cx }}" cy="{{ n.cy }}" r="{{ n.r }}" fill="{{ n.fill }}" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke" style="cursor:{{ n.cursor }};pointer-events:none;"></circle>
+                <circle cx="0" cy="0" data-dc-bind-cx="{{ n.cx }}" data-dc-bind-cy="{{ n.cy }}" r="16" fill="transparent" style="cursor:{{ n.cursor }};" onPointerDown="{{ n.onDown }}"></circle>
+                <circle cx="0" cy="0" r="6.5" data-dc-bind-cx="{{ n.cx }}" data-dc-bind-cy="{{ n.cy }}" data-dc-bind-r="{{ n.r }}" fill="{{ n.fill }}" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke" style="cursor:{{ n.cursor }};pointer-events:none;"></circle>
               </sc-for>
             </svg>
 
@@ -856,7 +856,7 @@ class Component extends DCLogic {
       this.setState({ user:r.user, authBusy:false, authName:'', authPass:'', authError:'' });
       const back = this._afterAuth; this._afterAuth = null;
       if(back === 'create'){ this.startCreate(); }
-      else if(back === 'demo'){ this.demoOpen(); }
+      else if(back === 'share'){ this.setState({ screen:'create', createTab:'share' }, ()=>this.generateLink()); }
       else { this._nav('dashboard'); }
     }).catch((err)=>{
       this.setState({ authBusy:false, authError: err.message || (this.state.lang==='vi'?'Có lỗi xảy ra.':'Something went wrong.') });
@@ -1554,9 +1554,9 @@ class Component extends DCLogic {
   startCreate(){ if(!this.requireAuth('create')) return; this._sessData=null; this.hist=[{nodes:[],edges:[]}]; this.hptr=0; this.setState({ nodes:[], edges:[], labels:[], histIdx:0, histLen:1, penLast:null, connectFrom:null, ownerPos:null, created:false, token:null, createTab:'map', aerialChosen:false }); this._nav('create'); }
   goHome(){ this._teardownChannel(); this._nav(''); }
   demoOpen(){ // quick demo: create a session with the sample map and jump to graph editor
-    if(!this.requireAuth('demo')) return;
+    this._teardownChannel();
     this.setState({ mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048, aerialChosen:true, nodes:[], edges:[], labels:[], ownerPos:{xRatio:0.55,yRatio:0.46} });
-    this._createSession(60, null, ()=>{ this.setState({screen:'create', createTab:'graph', sheetOpen:true}); this._scheduleFit(); this._toast(this.L().demoReady); }, false);
+    this._createSession(60, null, ()=>{ this._nav('create'); this.setState({screen:'create', createTab:'graph', sheetOpen:true}); this._scheduleFit(); this._toast(this.L().demoReady); }, false);
   }
   chooseAerial(){ this.setState({ mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048, aerialChosen:true, createTab:'pos' }); this._scheduleFit(); }
   triggerUpload(){ if(this.fileRef.current) this.fileRef.current.click(); }
@@ -1632,6 +1632,7 @@ class Component extends DCLogic {
     this.setState({ token, ownerToken, expiresAt, created:!!persist }, cb);
   }
   generateLink(){
+    if(!this.requireAuth('share')) return;
     if(!this.state.ownerPos){ this.setState({ createTab:'pos' }); this._toast(this.L().needOwnerPos); return; }
     const L = this.L();
     let min;
@@ -1820,7 +1821,7 @@ class Component extends DCLogic {
       const active = st.createTab===k;
       return { key:k, num:i+1, label,
         onClick:()=>this.setState({ createTab:k }),
-        style:`display:inline-flex;align-items:center;gap:7px;flex:none;padding:8px 12px;border-radius:9px;border:1.5px solid ${active?'#dc2626':'#e2e8f0'};background:${active?'#fef2f2':'#fff'};color:${active?'#dc2626':'#64748b'};font-weight:700;font-size:.8rem;cursor:pointer;`,
+        style:`display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:0;padding:8px 10px;border-radius:9px;border:1.5px solid ${active?'#dc2626':'#e2e8f0'};background:${active?'#fef2f2':'#fff'};color:${active?'#dc2626':'#64748b'};font-weight:700;font-size:.8rem;cursor:pointer;`,
         numStyle:`width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:.68rem;background:${active?'#dc2626':'#e2e8f0'};color:${active?'#fff':'#94a3b8'};` };
     });
 

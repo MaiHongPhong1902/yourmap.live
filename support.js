@@ -419,6 +419,11 @@
     for (const { name, value } of [...node.attributes]) {
       if (name === "sc-name" || name === "data-dc-tpl") continue;
       let key = name;
+      if (key.startsWith("data-dc-bind-")) {
+        key = kebabToCamel(key.slice("data-dc-bind-".length));
+        propGetters.push([key, compileAttr(value)]);
+        continue;
+      }
       if (key.startsWith(CAMEL_ATTR))
         key = kebabToCamel(key.slice(CAMEL_ATTR.length));
       if (key === "hint-size") {

@@ -331,7 +331,7 @@ window.MSNet = (function () {
                 </select>
                 <sc-if value="{{ expiryCustom }}" hint-placeholder-val="{{ false }}">
                   <label style="{{ fieldLabelStyle }}">{{ s.expiryDateLabel }}</label>
-                  <input type="datetime-local" value="{{ expiryDate }}" min="{{ minDateTime }}" onChange="{{ onExpiryDate }}" style="{{ inputStyle }}">
+                  <input type="datetime-local" value="2000-01-01T00:00" data-dc-bind-value="{{ expiryDate }}" min="{{ minDateTime }}" onChange="{{ onExpiryDate }}" style="{{ inputStyle }}">
                 </sc-if>
                 <label style="display:flex;align-items:center;gap:10px;margin:16px 0 4px;cursor:pointer;font-size:.9rem;font-weight:600;">
                   <input type="checkbox" checked="{{ usePassword }}" onChange="{{ onTogglePw }}" style="width:17px;height:17px;accent-color:#dc2626;">{{ s.setPassword }}
@@ -469,6 +469,16 @@ window.MSNet = (function () {
                 <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0 0 L10 5 L0 10 z" fill="#dc2626"/></marker>
                 <marker id="arrowg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0 0 L10 5 L0 10 z" fill="#64748b"/></marker>
               </defs>
+              <!-- free-form areas and drawing previews -->
+              <sc-for list="{{ areasView }}" as="ar" hint-placeholder-count="0">
+                <polygon points="0 0 0 0" data-dc-bind-points="{{ ar.points }}" fill="{{ ar.fill }}" stroke="{{ ar.stroke }}" stroke-width="{{ ar.sw }}" stroke-dasharray="{{ ar.dash }}" vector-effect="non-scaling-stroke" style="pointer-events:none;"></polygon>
+              </sc-for>
+              <sc-if value="{{ areaDraftOn }}" hint-placeholder-val="{{ false }}">
+                <polygon points="0 0 0 0" data-dc-bind-points="{{ areaDraftPts }}" fill="rgba(220,38,38,.12)" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 5" vector-effect="non-scaling-stroke" style="pointer-events:none;"></polygon>
+                <sc-for list="{{ areaDraftNodes }}" as="p" hint-placeholder-count="0">
+                  <circle cx="0" cy="0" data-dc-bind-cx="{{ p.cx }}" data-dc-bind-cy="{{ p.cy }}" r="7" fill="#fff" stroke="#dc2626" stroke-width="2" vector-effect="non-scaling-stroke" style="pointer-events:none;"></circle>
+                </sc-for>
+              </sc-if>
               <!-- base edges -->
               <sc-for list="{{ edgesView }}" as="e" hint-placeholder-count="0">
                 <line x1="0" y1="0" x2="0" y2="0" data-dc-bind-x1="{{ e.x1 }}" data-dc-bind-y1="{{ e.y1 }}" data-dc-bind-x2="{{ e.x2 }}" data-dc-bind-y2="{{ e.y2 }}" stroke="{{ e.color }}" stroke-width="{{ e.w }}" stroke-linecap="round" stroke-dasharray="{{ e.dash }}" marker-end="{{ e.marker }}" vector-effect="non-scaling-stroke" style="cursor:{{ e.cursor }};filter:{{ e.filter }};" onClick="{{ e.onClick }}"></line>
@@ -489,8 +499,11 @@ window.MSNet = (function () {
               <!-- nodes -->
               <sc-for list="{{ nodesView }}" as="n" hint-placeholder-count="0">
                 <circle cx="0" cy="0" data-dc-bind-cx="{{ n.cx }}" data-dc-bind-cy="{{ n.cy }}" r="16" fill="transparent" style="cursor:{{ n.cursor }};" onPointerDown="{{ n.onDown }}"></circle>
-                <circle cx="0" cy="0" r="6.5" data-dc-bind-cx="{{ n.cx }}" data-dc-bind-cy="{{ n.cy }}" data-dc-bind-r="{{ n.r }}" fill="{{ n.fill }}" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke" style="cursor:{{ n.cursor }};pointer-events:none;"></circle>
+                <circle cx="0" cy="0" r="4" data-dc-bind-cx="{{ n.cx }}" data-dc-bind-cy="{{ n.cy }}" data-dc-bind-r="{{ n.r }}" fill="{{ n.fill }}" stroke="#fff" stroke-width="1.7" vector-effect="non-scaling-stroke" style="cursor:{{ n.cursor }};pointer-events:none;"></circle>
               </sc-for>
+              <sc-if value="{{ penGuideOn }}" hint-placeholder-val="{{ false }}">
+                <line x1="0" y1="0" x2="0" y2="0" data-dc-bind-x1="{{ penGuideX1 }}" data-dc-bind-y1="{{ penGuideY1 }}" data-dc-bind-x2="{{ penGuideX2 }}" data-dc-bind-y2="{{ penGuideY2 }}" stroke="#f59e0b" stroke-width="2" stroke-dasharray="7 6" vector-effect="non-scaling-stroke" style="pointer-events:none;"></line>
+              </sc-if>
             </svg>
 
             <!-- pins layer -->
@@ -499,13 +512,15 @@ window.MSNet = (function () {
               <sc-for list="{{ areaLabels }}" as="ar" hint-placeholder-count="0">
                 <div style="position:absolute;left:{{ ar.l }}%;top:{{ ar.t }}%;width:{{ ar.w }}%;height:{{ ar.h }}%;background:rgba(220,38,38,.12);border:2px solid rgba(220,38,38,.7);border-radius:6px;pointer-events:none;"></div>
               </sc-for>
-              <!-- preview khi đang kéo khoanh vùng -->
-              <sc-if value="{{ regionDraftOn }}" hint-placeholder-val="{{ false }}">
-                <div style="position:absolute;left:{{ regionDraftL }}%;top:{{ regionDraftT }}%;width:{{ regionDraftW }}%;height:{{ regionDraftH }}%;background:rgba(220,38,38,.1);border:2px dashed rgba(220,38,38,.8);border-radius:6px;pointer-events:none;"></div>
-              </sc-if>
+              <!-- legacy rectangle labels remain compatible with saved maps -->
               <!-- tên điểm / tên vùng (chip, giữ cỡ chữ theo zoom) -->
               <sc-for list="{{ labelsView }}" as="lb" hint-placeholder-count="0">
                 <div style="position:absolute;left:{{ lb.l }}%;top:{{ lb.t }}%;transform:{{ lb.tf }};transform-origin:bottom center;pointer-events:none;">
+                  <sc-if value="{{ lb.point }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;left:50%;bottom:-10px;width:18px;height:18px;border-radius:50% 50% 50% 0;transform:translateX(-50%) rotate(-45deg);background:#dc2626;border:2px solid #fff;box-shadow:0 3px 8px rgba(15,23,42,.28);">
+                      <span style="position:absolute;left:50%;top:50%;width:5px;height:5px;border-radius:50%;background:#fff;transform:translate(-50%,-50%) rotate(45deg);"></span>
+                    </div>
+                  </sc-if>
                   <div style="display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:8px;background:rgba(15,23,42,.86);color:#fff;font-size:.72rem;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.35);max-width:180px;overflow:hidden;text-overflow:ellipsis;">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" stroke-width="2.4" style="flex:none;"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                     {{ lb.text }}
@@ -514,7 +529,7 @@ window.MSNet = (function () {
                 </div>
               </sc-for>
               <sc-if value="{{ hasOwnerPin }}" hint-placeholder-val="{{ false }}">
-                <div style="position:absolute;left:{{ ownerPinL }}%;top:{{ ownerPinT }}%;transform:translate(-50%,-100%) scale(calc(1/var(--z,1)));transform-origin:bottom center;pointer-events:auto;cursor:{{ ownerPinCursor }};animation:pinpop .3s ease;" onPointerDown="{{ onOwnerPinDown }}">
+                <div data-pin="owner" style="position:absolute;left:{{ ownerPinL }}%;top:{{ ownerPinT }}%;transform:translate(-50%,-100%) scale(calc(1/var(--z,1)));transform-origin:bottom center;pointer-events:auto;cursor:{{ ownerPinCursor }};animation:pinpop .3s ease;" onPointerDown="{{ onOwnerPinDown }}">
                   <sc-if value="{{ ownerPinLive }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:50%;bottom:-4px;width:24px;height:24px;border-radius:50%;background:#dc2626;animation:ripple 1.4s ease-out infinite;"></div></sc-if>
                   <div style="position:relative;width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#dc2626;box-shadow:0 4px 10px rgba(0,0,0,.35);border:2.5px solid #fff;display:grid;place-items:center;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(45deg);"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
@@ -522,7 +537,7 @@ window.MSNet = (function () {
                 </div>
               </sc-if>
               <sc-if value="{{ hasViewerPin }}" hint-placeholder-val="{{ false }}">
-                <div style="position:absolute;left:{{ viewerPinL }}%;top:{{ viewerPinT }}%;transform:translate(-50%,-100%) scale(calc(1/var(--z,1)));transform-origin:bottom center;pointer-events:auto;cursor:{{ viewerPinCursor }};animation:pinpop .3s ease;" onPointerDown="{{ onViewerPinDown }}">
+                <div data-pin="viewer" style="position:absolute;left:{{ viewerPinL }}%;top:{{ viewerPinT }}%;transform:translate(-50%,-100%) scale(calc(1/var(--z,1)));transform-origin:bottom center;pointer-events:auto;cursor:{{ viewerPinCursor }};animation:pinpop .3s ease;" onPointerDown="{{ onViewerPinDown }}">
                   <div style="position:relative;width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#2563eb;box-shadow:0 4px 10px rgba(0,0,0,.35);border:2.5px solid #fff;display:grid;place-items:center;">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" style="transform:rotate(45deg);"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
                   </div>
@@ -612,6 +627,22 @@ window.MSNet = (function () {
   <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
     <div style="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#0f172a;color:#fff;padding:11px 20px;border-radius:11px;font-size:.86rem;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.3);z-index:200;animation:fadeup .3s ease;">{{ toast }}</div>
   </sc-if>
+  <sc-if value="{{ labelEditorOn }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;background:rgba(15,23,42,.48);backdrop-filter:blur(4px);display:grid;place-items:center;padding:18px;z-index:220;">
+      <div style="width:min(360px,100%);background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 20px 60px rgba(15,23,42,.28);padding:18px;">
+        <div style="font-size:1rem;font-weight:800;color:#0f172a;margin-bottom:5px;">{{ labelEditorTitle }}</div>
+        <div style="font-size:.78rem;color:#64748b;margin-bottom:13px;">{{ labelEditorHint }}</div>
+        <input ref="{{ labelInputRef }}" value="{{ labelDraftText }}" onInput="{{ onLabelDraft }}" onKeyDown="{{ onLabelEditorKey }}" maxlength="60" placeholder="{{ labelNamePlaceholder }}" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1.5px solid #cbd5e1;border-radius:10px;outline:none;font-size:.92rem;color:#0f172a;">
+        <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
+          <sc-if value="{{ canDeleteLabel }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ deleteLabelEditor }}" style="margin-right:auto;padding:9px 12px;border-radius:9px;border:1.5px solid #fecaca;background:#fff;color:#dc2626;font-weight:700;cursor:pointer;">{{ labelDelete }}</button>
+          </sc-if>
+          <button onClick="{{ cancelLabelEditor }}" style="padding:9px 13px;border-radius:9px;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font-weight:700;cursor:pointer;">{{ labelCancel }}</button>
+          <button onClick="{{ saveLabelEditor }}" style="padding:9px 15px;border-radius:9px;border:none;background:#dc2626;color:#fff;font-weight:700;cursor:pointer;box-shadow:0 5px 14px rgba(220,38,38,.25);">{{ labelSave }}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:&quot;100%&quot;}}">
@@ -627,18 +658,21 @@ class Component extends DCLogic {
     this.viewerLinkRef = React.createRef();
     this.ownerLinkRef = React.createRef();
     this.imgRef = React.createRef();
+    this.labelInputRef = React.createRef();
+    this._penPendingCursor = null;
     // viewport transform (imperative — not in state to avoid re-render churn)
     this.tx = 0; this.ty = 0; this.sc = 1;
     this.peerId = Math.random().toString(36).slice(2,10);
     this.peers = {};
     this.channel = null;
-    this.hist = [{nodes:[],edges:[]}]; this.hptr = 0;
+    this.hist = [{nodes:[],edges:[],labels:[]}]; this.hptr = 0;
+    this._areaRedo = [];
     this.state = {
       screen:'home', lang:'vi',
       mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048,
-      nodes:[], edges:[], labels:[], regionDraft:null,
+      nodes:[], edges:[], labels:[], areaDraft:[], labelEditor:null, labelDraftText:'',
       tool:'pen', newBidir:true,
-      connectFrom:null, selNode:null, selEdge:null, penLast:null,
+      connectFrom:null, selNode:null, selEdge:null, penLast:null, penCursor:null,
       histIdx:0, histLen:1,
       createTab:'map', aerialChosen:false,
       token:null, ownerToken:null, created:false,
@@ -662,7 +696,39 @@ class Component extends DCLogic {
     window.addEventListener('resize', this._onResize);
     this._onHash = () => this.route();
     window.addEventListener('hashchange', this._onHash);
-    this._onKey = (e) => { if(e.key === 'Escape' && (this.state.penLast || this.state.connectFrom)) this.setState({ penLast:null, connectFrom:null }); };
+    this._onKey = (e) => {
+      const key = String(e.key || '').toLowerCase();
+      const target = e.target;
+      const typing = !!target && (['INPUT','TEXTAREA','SELECT'].includes(target.tagName) || target.isContentEditable);
+      const graphEditing = this.state.screen === 'graph' || (this.state.screen === 'create' && this.state.createTab === 'graph');
+      const mod = e.ctrlKey || e.metaKey;
+      if(!typing && graphEditing && mod && key === 'z'){
+        e.preventDefault();
+        if(this.state.tool === 'area' && e.shiftKey && (this._areaRedo||[]).length) this._redoAreaPoint();
+        else if(this.state.tool === 'area' && !e.shiftKey && (this.state.areaDraft||[]).length) this._undoAreaPoint();
+        else if(e.shiftKey) this.redo(); else this.undo();
+        return;
+      }
+      if(!typing && graphEditing && mod && key === 'y'){
+        e.preventDefault();
+        if(this.state.tool === 'area' && (this._areaRedo||[]).length) this._redoAreaPoint(); else this.redo();
+        return;
+      }
+      if(!typing && graphEditing && !mod){
+        const shortcuts = { p:'pen', a:'area', v:'edit', n:'node', l:'label', c:'connect', d:'delete' };
+        if(shortcuts[key]){ e.preventDefault(); this.setTool(shortcuts[key]); return; }
+      }
+      if(!typing && graphEditing && key === 'enter' && this.state.tool === 'area' && (this.state.areaDraft||[]).length >= 3){
+        e.preventDefault();
+        this._finishArea();
+        return;
+      }
+      if(e.key === 'Escape'){
+        if(this.state.labelEditor){ this.cancelLabelEditor(); return; }
+        if((this.state.areaDraft||[]).length){ this._areaRedo=[]; this.setState({ areaDraft:[] }); return; }
+        if(this.state.penLast || this.state.connectFrom) this.setState({ penLast:null, penCursor:null, connectFrom:null });
+      }
+    };
     window.addEventListener('keydown', this._onKey);
     // pointer + wheel on viewport
     this._bindStage();
@@ -681,6 +747,8 @@ class Component extends DCLogic {
     window.removeEventListener('hashchange', this._onHash);
     window.removeEventListener('keydown', this._onKey);
     clearInterval(this._tick);
+    if(this._penGuideFrame) cancelAnimationFrame(this._penGuideFrame);
+    this._penPendingCursor = null;
     this._teardownChannel();
   }
   _syncMapImg(){
@@ -694,6 +762,9 @@ class Component extends DCLogic {
     // rebind stage listeners once refs exist
     if(!this._stageBound) this._bindStage();
     this._syncMapImg();
+    if(this.state.labelEditor && !prev.labelEditor && this.labelInputRef.current){
+      requestAnimationFrame(()=>{ try{ this.labelInputRef.current.focus(); this.labelInputRef.current.select(); }catch(e){} });
+    }
     // (re)draw QR when link becomes available
     if(this.state.created && this.state.token && this.qrRef.current && this._qrToken !== this.state.token){
       this._qrToken = this.state.token;
@@ -757,12 +828,13 @@ class Component extends DCLogic {
     this.setState({ screen:'home' });
   }
   _applySession(token, sess, otoken){
-    this.hist = [this._snap(sess.nodes, sess.edges)]; this.hptr = 0;
+    this._areaRedo = [];
+    this.hist = [this._snap(sess.nodes, sess.edges, sess.labels)]; this.hptr = 0;
     this.setState({
       token, ownerToken: otoken || null,
       mapImage: sess.mapImage, mapW: sess.mapW, mapH: sess.mapH,
       nodes: sess.nodes || [], edges: sess.edges || [], labels: sess.labels || [],
-      histIdx:0, histLen:1, penLast:null, connectFrom:null,
+      histIdx:0, histLen:1, penLast:null, penCursor:null, connectFrom:null, areaDraft:[], labelEditor:null, labelDraftText:'',
       ownerPos: sess.ownerPos || null, ownerLocked: !!sess.ownerLocked,
       expiresAt: sess.expiresAt || null,
       route:null, routeError:null, searchSegs:[], viewerPos:null, picking:false, ownerLive:false,
@@ -790,9 +862,9 @@ class Component extends DCLogic {
   }
   _saveGraph(){ this._save({ nodes: this.state.nodes, edges: this.state.edges, labels: this.state.labels }); this._send({type:'graph', nodes:this.state.nodes, edges:this.state.edges, labels:this.state.labels}); this._pushServer({ nodes:this.state.nodes, edges:this.state.edges, labels:this.state.labels }); this._pushHist(); }
   // ---- undo / redo history (instance-based so it is immune to React batching) ----
-  _snap(n, e){ return { nodes: JSON.parse(JSON.stringify(n||[])), edges: JSON.parse(JSON.stringify(e||[])) }; }
+  _snap(n, e, labels){ return { nodes: JSON.parse(JSON.stringify(n||[])), edges: JSON.parse(JSON.stringify(e||[])), labels: JSON.parse(JSON.stringify(labels||[])) }; }
   _pushHist(){
-    const snap = this._snap(this.state.nodes, this.state.edges);
+    const snap = this._snap(this.state.nodes, this.state.edges, this.state.labels);
     const top = this.hist[this.hptr];
     if(top && JSON.stringify(top) === JSON.stringify(snap)) return; // skip no-op
     this.hist = this.hist.slice(0, this.hptr + 1);
@@ -802,15 +874,17 @@ class Component extends DCLogic {
     this.setState({ histIdx: this.hptr, histLen: this.hist.length });
   }
   _applyHist(){
-    const c = this._snap(this.hist[this.hptr].nodes, this.hist[this.hptr].edges);
-    this.setState({ nodes:c.nodes, edges:c.edges, histIdx:this.hptr, histLen:this.hist.length, selNode:null, selEdge:null, connectFrom:null, route:null, searchSegs:[] });
-    this._save({ nodes:c.nodes, edges:c.edges });
-    this._send({type:'graph', nodes:c.nodes, edges:c.edges});
-    this._pushServer({ nodes:c.nodes, edges:c.edges });
+    this._penPendingCursor = null;
+    this._areaRedo = [];
+    const c = this._snap(this.hist[this.hptr].nodes, this.hist[this.hptr].edges, this.hist[this.hptr].labels);
+    this.setState({ nodes:c.nodes, edges:c.edges, labels:c.labels, areaDraft:[], labelEditor:null, histIdx:this.hptr, histLen:this.hist.length, selNode:null, selEdge:null, connectFrom:null, penLast:null, penCursor:null, route:null, searchSegs:[] });
+    this._save({ nodes:c.nodes, edges:c.edges, labels:c.labels });
+    this._send({type:'graph', nodes:c.nodes, edges:c.edges, labels:c.labels});
+    this._pushServer({ nodes:c.nodes, edges:c.edges, labels:c.labels });
   }
   undo(){ if(this.hptr > 0){ this.hptr--; this._applyHist(); } }
   redo(){ if(this.hptr < this.hist.length - 1){ this.hptr++; this._applyHist(); } }
-  _resetHist(n, e){ this.hist = [this._snap(n||[], e||[])]; this.hptr = 0; this.setState({ histIdx:0, histLen:1 }); }
+  _resetHist(n, e, labels){ this.hist = [this._snap(n||[], e||[], labels||[])]; this.hptr = 0; this.setState({ histIdx:0, histLen:1 }); }
   _saveOwner(){ this._save({ ownerPos: this.state.ownerPos, ownerLocked: this.state.ownerLocked }); this._send({type:'owner', pos:this.state.ownerPos, locked:this.state.ownerLocked}); this._pushServer({ ownerPos:this.state.ownerPos, ownerLocked:this.state.ownerLocked }); }
 
   /* crypto-ish helpers */
@@ -1018,7 +1092,7 @@ class Component extends DCLogic {
     const ids = Object.keys(this._ptrs);
     if(ids.length >= 2){
       this.drag = null;
-      if(this.state.regionDraft) this.setState({ regionDraft:null });
+      if((this.state.areaDraft||[]).length) this.setState({ areaDraft:[] });
       const p = ids.map(id=>this._ptrs[id]);
       const vp = this.vpRef.current.getBoundingClientRect();
       const mx = (p[0].x+p[1].x)/2 - vp.left, my = (p[0].y+p[1].y)/2 - vp.top;
@@ -1029,12 +1103,6 @@ class Component extends DCLogic {
     if(e.target.closest('[data-pin]') || e.target.tagName === 'circle') return; // handled by element
     const st = this.state;
     const editingGraph = st.screen === 'graph' || (st.screen === 'create' && st.createTab === 'graph');
-    // Công cụ "Đặt tên": kéo để khoanh vùng (tap sẽ đặt điểm khi thả).
-    if(editingGraph && st.tool === 'label'){
-      const r = this._ratio(e.clientX, e.clientY);
-      this.drag = { mode:'region', sx:r.xRatio, sy:r.yRatio, cx:r.xRatio, cy:r.yRatio, x:e.clientX, y:e.clientY, moved:false };
-      return;
-    }
     this.drag = { mode:'pan', x:e.clientX, y:e.clientY, ox:this.tx, oy:this.ty, moved:false };
   }
   _pointerMove(e){
@@ -1050,6 +1118,17 @@ class Component extends DCLogic {
       this.sc = ns; this.tx = mx - this._pinch.wx*ns; this.ty = my - this._pinch.wy*ns; this._applyTransform();
       return;
     }
+    if(this.state.tool === 'pen' && this.state.penLast){
+      const r = this._ratio(e.clientX, e.clientY);
+      this._penPendingCursor = r;
+      if(!this._penGuideFrame){
+        this._penGuideFrame = requestAnimationFrame(()=>{
+          this._penGuideFrame = null;
+          const cursor = this._penPendingCursor;
+          if(this.state.tool === 'pen' && this.state.penLast && cursor) this.setState({ penCursor:cursor });
+        });
+      }
+    }
     const d = this.drag; if(!d) return;
     const dx = e.clientX - d.x, dy = e.clientY - d.y;
     if(Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
@@ -1057,7 +1136,6 @@ class Component extends DCLogic {
     else if(d.mode === 'node'){ const r = this._ratio(e.clientX, e.clientY); this._updateNode(d.id, r); }
     else if(d.mode === 'owner'){ const r = this._ratio(e.clientX, e.clientY); this.setState({ ownerPos:r }); }
     else if(d.mode === 'viewer'){ const r = this._ratio(e.clientX, e.clientY); this.setState({ viewerPos:r }); }
-    else if(d.mode === 'region'){ const r = this._ratio(e.clientX, e.clientY); d.cx = r.xRatio; d.cy = r.yRatio; this.setState({ regionDraft:{ x:Math.min(d.sx,d.cx), y:Math.min(d.sy,d.cy), w:Math.abs(d.cx-d.sx), h:Math.abs(d.cy-d.sy) } }); }
   }
   _pointerUp(e){
     if(this._ptrs) delete this._ptrs[e.pointerId];
@@ -1068,12 +1146,6 @@ class Component extends DCLogic {
     else if(d.mode === 'node' && d.moved){ this._applyGraph(this.state.nodes, this.state.edges); }
     else if(d.mode === 'owner' && d.moved){ this._saveOwner(); }
     else if(d.mode === 'viewer' && d.moved && this.state.route){ this._recomputeRoute(); }
-    else if(d.mode === 'region'){
-      const rect = { x:Math.min(d.sx,d.cx), y:Math.min(d.sy,d.cy), w:Math.abs(d.cx-d.sx), h:Math.abs(d.cy-d.sy) };
-      this.setState({ regionDraft:null });
-      if(d.moved && rect.w > 0.015 && rect.h > 0.015) this._addAreaLabel(rect); // kéo đủ lớn → vùng
-      else this._labelClick({ xRatio:d.sx, yRatio:d.sy }); // chỉ chạm → điểm
-    }
   }
   _onWheel(e){
     e.preventDefault();
@@ -1131,13 +1203,19 @@ class Component extends DCLogic {
         else this._addNode(r);
       }
       else if(st.tool === 'connect'){ this._connectClick(r); }
+      else if(st.tool === 'area'){ this._areaClick(r); }
       else if(st.tool === 'delete'){
         const nearL = this._nearestLabel(r);
         if(nearL && nearL.dist < 40){ this._deleteLabel(nearL.label.id); return; }
         const near = this._nearestNode(r); if(near && near.dist < 45) this._deleteNode(near.node.id);
       }
       else if(st.tool === 'label'){ this._labelClick(r); }
-      else if(st.tool === 'edit'){ const near = this._nearestNode(r); this.setState({ selNode: (near && near.dist < 45) ? near.node.id : null, selEdge:null }); }
+      else if(st.tool === 'edit'){
+        const nearNode = this._nearestNode(r), nearEdge = this._nearestEdge(r);
+        if(nearNode && nearNode.dist < 45 && (!nearEdge || nearNode.dist <= nearEdge.dist)) this.setState({ selNode:nearNode.node.id, selEdge:null });
+        else if(nearEdge && nearEdge.dist < 32) this.setState({ selNode:null, selEdge:nearEdge.edge.id });
+        else this.setState({ selNode:null, selEdge:null });
+      }
     } else if(placingOwner){
       this.setState({ ownerPos:r }, ()=>{ if(st.screen==='owner') this._saveOwner(); });
     } else if(placingViewer){
@@ -1161,7 +1239,13 @@ class Component extends DCLogic {
     this.setState({ nodes, edges, selNode:null }, ()=>this._saveGraph());
   }
   /* ---------------- location labels (đặt tên vị trí) ---------------- */
-  _labelCenter(l){ return { x: l.wRatio ? l.xRatio + l.wRatio/2 : l.xRatio, y: l.hRatio ? l.yRatio + l.hRatio/2 : l.yRatio }; }
+  _labelCenter(l){
+    if(Array.isArray(l.points) && l.points.length){
+      const sum = l.points.reduce((a,p)=>({x:a.x+p.xRatio,y:a.y+p.yRatio}), {x:0,y:0});
+      return { x:sum.x/l.points.length, y:sum.y/l.points.length };
+    }
+    return { x:l.wRatio ? l.xRatio + l.wRatio/2 : l.xRatio, y:l.hRatio ? l.yRatio + l.hRatio/2 : l.yRatio };
+  }
   _nearestLabel(r){
     let best=null, bd=Infinity;
     for(const l of (this.state.labels||[])){
@@ -1171,28 +1255,86 @@ class Component extends DCLogic {
     }
     return best ? { label:best, dist:bd } : null;
   }
-  _addAreaLabel(rect){
-    const txt = (window.prompt(this.L().labelAreaPrompt, '') || '').trim();
-    if(!txt) return;
-    const id = 'r' + this._rid(4);
-    const labels = (this.state.labels||[]).concat([{ id, text:txt.slice(0,60), xRatio:rect.x, yRatio:rect.y, wRatio:rect.w, hRatio:rect.h }]);
-    this.setState({ labels }, ()=>{ this._saveGraph(); this._toast(this.L().labelAdded); });
+  _addAreaLabel(points){
+    if(!Array.isArray(points) || points.length < 3) return;
+    this._openLabelEditor({ kind:'area', points:points.map(p=>({xRatio:p.xRatio,yRatio:p.yRatio})) });
+  }
+  _openLabelEditor(opts){
+    const label = opts && opts.label;
+    const legacyArea = label && label.wRatio != null;
+    this.setState({
+      labelEditor:{ mode:label?'edit':'create', id:label?label.id:null, kind:label && (label.points || legacyArea) ? 'area' : ((opts&&opts.kind)||'point'),
+        points:(opts&&opts.points) || (label&&label.points) || null,
+        xRatio:(opts&&opts.xRatio != null ? opts.xRatio : (label&&label.xRatio)),
+        yRatio:(opts&&opts.yRatio != null ? opts.yRatio : (label&&label.yRatio)),
+        wRatio:label&&label.wRatio, hRatio:label&&label.hRatio },
+      labelDraftText:label ? label.text : ''
+    });
+  }
+  onLabelDraft(e){ this.setState({ labelDraftText:e.target.value }); }
+  onLabelEditorKey(e){
+    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); this.saveLabelEditor(); }
+    else if(e.key === 'Escape'){ e.preventDefault(); this.cancelLabelEditor(); }
+  }
+  cancelLabelEditor(){ this.setState({ labelEditor:null, labelDraftText:'' }); }
+  saveLabelEditor(){
+    const ed = this.state.labelEditor;
+    if(!ed) return;
+    const text = String(this.state.labelDraftText || '').trim().slice(0,60);
+    if(!text){ this._toast(this.L().labelRequired); return; }
+    let labels = this.state.labels || [];
+    if(ed.mode === 'edit'){
+      labels = labels.map(l => l.id===ed.id ? {...l, text} : l);
+    } else {
+      const next = { id:(ed.kind==='area'?'r':'l') + this._rid(4), text };
+      if(ed.kind === 'area') next.points = (ed.points||[]).map(p=>({xRatio:p.xRatio,yRatio:p.yRatio}));
+      else { next.xRatio = ed.xRatio; next.yRatio = ed.yRatio; }
+      labels = labels.concat([next]);
+    }
+    this.setState({ labels, labelEditor:null, labelDraftText:'' }, ()=>{ this._saveGraph(); this._toast(this.L().labelAdded); });
+  }
+  deleteLabelEditor(){
+    const ed = this.state.labelEditor;
+    if(ed && ed.mode === 'edit') this._deleteLabel(ed.id);
+    this.setState({ labelEditor:null, labelDraftText:'' });
+  }
+  _areaClick(r){
+    const draft = this.state.areaDraft || [];
+    if(draft.length >= 3){
+      const first = draft[0];
+      const closeDist = Math.hypot((first.xRatio-r.xRatio)*1000, (first.yRatio-r.yRatio)*this._vbH());
+      if(closeDist < 28){ this._finishArea(); return; }
+    }
+    this._areaRedo = [];
+    this.setState({ areaDraft:draft.concat([{xRatio:r.xRatio,yRatio:r.yRatio}]) });
+  }
+  _undoAreaPoint(){
+    const draft = this.state.areaDraft || [];
+    if(!draft.length) return;
+    this._areaRedo = (this._areaRedo||[]).concat([draft[draft.length-1]]);
+    this.setState({ areaDraft:draft.slice(0,-1) });
+  }
+  _redoAreaPoint(){
+    const redo = this._areaRedo || [];
+    if(!redo.length) return;
+    this._areaRedo = redo.slice(0,-1);
+    this.setState({ areaDraft:(this.state.areaDraft||[]).concat([redo[redo.length-1]]) });
+  }
+  _finishArea(){
+    const points = (this.state.areaDraft||[]).slice();
+    if(points.length < 3){ this._toast(this.L().areaNeedThree); return; }
+    this._areaRedo = [];
+    this.setState({ areaDraft:[] });
+    this._addAreaLabel(points);
   }
   _labelClick(r){
     const near = this._nearestLabel(r);
     if(near && near.dist < 40){ // chạm lại nhãn có sẵn → sửa/xóa
-      const txt = (window.prompt(this.L().labelEditPrompt, near.label.text) || '').trim();
-      if(txt === near.label.text) return;
-      if(!txt){ this._deleteLabel(near.label.id); return; }
-      const labels = this.state.labels.map(l => l.id===near.label.id ? {...l, text:txt} : l);
-      this.setState({ labels }, ()=>this._saveGraph());
+      this._openLabelEditor({ label:near.label });
       return;
     }
-    const txt = (window.prompt(this.L().labelPrompt, '') || '').trim();
-    if(!txt) return;
-    const id = 'l' + this._rid(4);
-    const labels = (this.state.labels||[]).concat([{ id, xRatio:r.xRatio, yRatio:r.yRatio, text:txt.slice(0,60) }]);
-    this.setState({ labels }, ()=>{ this._saveGraph(); this._toast(this.L().labelAdded); });
+    this._openLabelEditor({ xRatio:r.xRatio, yRatio:r.yRatio, kind:'point' });
+    return;
   }
   _deleteLabel(id){
     const labels = (this.state.labels||[]).filter(l => l.id !== id);
@@ -1203,6 +1345,8 @@ class Component extends DCLogic {
     const st = this.state;
     if(st.tool === 'delete'){ this._deleteNode(id); return; }
     if(st.tool === 'connect'){ this._connectPick(id); return; }
+    if(st.tool === 'pen'){ this._penClick(this._ratio(e.clientX, e.clientY)); return; }
+    if(st.tool === 'area'){ this._areaClick(this._ratio(e.clientX, e.clientY)); return; }
     // edit/node → drag
     this.setState({ selNode:id, selEdge:null });
     this.drag = { mode:'node', id, moved:false, x:e.clientX, y:e.clientY };
@@ -1217,7 +1361,7 @@ class Component extends DCLogic {
     let targetId;
     if(nearNode && nearNode.dist < 26){
       targetId = nearNode.node.id;
-      if(targetId === st.penLast){ this.setState({ penLast:null }); return; } // click last anchor again → finish stroke
+      if(targetId === st.penLast){ this.setState({ penLast:null, penCursor:null }); return; } // click last anchor again → finish stroke
     } else if(nearEdge && nearEdge.dist < 22){
       // insert a node onto the edge, split it
       const e = nearEdge.edge; const pos = nearEdge.proj;
@@ -1239,7 +1383,7 @@ class Component extends DCLogic {
       const A = nodeById[last] || nodes.find(n=>n.id===last), B = nodes.find(n=>n.id===targetId);
       if(A && B) edges.push({ id:'e'+this._rid(4), from:last, to:targetId, weight:Math.round(this._dist(A,B)), bidirectional:st.newBidir, blocked:false });
     }
-    this._applyGraph(nodes, edges, { penLast:targetId, selNode:targetId, selEdge:null });
+    this._applyGraph(nodes, edges, { penLast:targetId, penCursor:null, selNode:targetId, selEdge:null });
   }
   // resolve a connect-tool click to a node id (existing node, a node inserted on a clicked road, or a new free node), then link
   _connectClick(r){
@@ -1374,9 +1518,10 @@ class Component extends DCLogic {
         const edges = Array.isArray(g.edges) ? g.edges : [];
         // nhãn tên vị trí: hỗ trợ cả file mới (graph.labels) lẫn cũ (không có → rỗng)
         const labels = Array.isArray(g.labels) ? g.labels : (Array.isArray(d.labels) ? d.labels : []);
-        this.hist = [this._snap(nodes, edges)]; this.hptr = 0;
+        this._areaRedo = [];
+        this.hist = [this._snap(nodes, edges, labels)]; this.hptr = 0;
         this.setState({
-          nodes, edges, labels, histIdx:0, histLen:1, penLast:null, connectFrom:null, selNode:null, selEdge:null,
+          nodes, edges, labels, areaDraft:[], labelEditor:null, labelDraftText:'', histIdx:0, histLen:1, penLast:null, penCursor:null, connectFrom:null, selNode:null, selEdge:null,
           mapImage: d.mapImage || this.state.mapImage, mapW: d.mapW || this.state.mapW, mapH: d.mapH || this.state.mapH,
         }, ()=>this._saveGraph());
         this._scheduleFit();
@@ -1386,7 +1531,7 @@ class Component extends DCLogic {
     reader.readAsText(file);
     e.target.value = '';
   }
-  clearGraph(){ if(!this.state.nodes.length && !this.state.edges.length) return; this.setState({ nodes:[], edges:[], selNode:null, selEdge:null, connectFrom:null, route:null, searchSegs:[] }, ()=>this._saveGraph()); this._toast(this.L().graphCleared); }
+  clearGraph(){ if(!this.state.nodes.length && !this.state.edges.length && !(this.state.labels||[]).length && !(this.state.areaDraft||[]).length && !this.state.labelEditor) return; this._areaRedo=[]; this.setState({ nodes:[], edges:[], labels:[], areaDraft:[], labelEditor:null, selNode:null, selEdge:null, connectFrom:null, penLast:null, penCursor:null, route:null, searchSegs:[] }, ()=>this._saveGraph()); this._toast(this.L().graphCleared); }
 
   /* ---------------- A* pathfinding ---------------- */
   _nearestNode(pt){
@@ -1551,11 +1696,13 @@ class Component extends DCLogic {
   clearRoute(){ if(this._anim){ clearInterval(this._anim); this._anim=null; } this.setState({ route:null, routeError:null, searchSegs:[], viewerPos:null, picking:false }); }
 
   /* ---------------- session actions ---------------- */
-  startCreate(){ if(!this.requireAuth('create')) return; this._sessData=null; this.hist=[{nodes:[],edges:[]}]; this.hptr=0; this.setState({ nodes:[], edges:[], labels:[], histIdx:0, histLen:1, penLast:null, connectFrom:null, ownerPos:null, created:false, token:null, createTab:'map', aerialChosen:false }); this._nav('create'); }
+  startCreate(){ if(!this.requireAuth('create')) return; this._sessData=null; this._areaRedo=[]; this.hist=[{nodes:[],edges:[],labels:[]}]; this.hptr=0; this.setState({ nodes:[], edges:[], labels:[], areaDraft:[], labelEditor:null, labelDraftText:'', histIdx:0, histLen:1, penLast:null, penCursor:null, connectFrom:null, ownerPos:null, created:false, token:null, createTab:'map', aerialChosen:false }); this._nav('create'); }
   goHome(){ this._teardownChannel(); this._nav(''); }
   demoOpen(){ // quick demo: create a session with the sample map and jump to graph editor
     this._teardownChannel();
-    this.setState({ mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048, aerialChosen:true, nodes:[], edges:[], labels:[], ownerPos:{xRatio:0.55,yRatio:0.46} });
+    this._areaRedo=[];
+    this.hist=[{nodes:[],edges:[],labels:[]}]; this.hptr=0;
+    this.setState({ mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048, aerialChosen:true, nodes:[], edges:[], labels:[], areaDraft:[], labelEditor:null, labelDraftText:'', penLast:null, penCursor:null, connectFrom:null, histIdx:0, histLen:1, ownerPos:{xRatio:0.55,yRatio:0.46} });
     this._createSession(60, null, ()=>{ this._nav('create'); this.setState({screen:'create', createTab:'graph', sheetOpen:true}); this._scheduleFit(); this._toast(this.L().demoReady); }, false);
   }
   chooseAerial(){ this.setState({ mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048, aerialChosen:true, createTab:'pos' }); this._scheduleFit(); }
@@ -1573,8 +1720,9 @@ class Component extends DCLogic {
       c.getContext('2d').drawImage(img,0,0,cw,ch);
       URL.revokeObjectURL(url);
       const finish = (mapImage)=>{
-        this.hist=[{nodes:[],edges:[]}]; this.hptr=0;
-        this.setState({ mapImage, mapW:w, mapH:h, aerialChosen:true, createTab:'pos', nodes:[], edges:[], histIdx:0, histLen:1, penLast:null, connectFrom:null });
+        this._areaRedo=[];
+        this.hist=[{nodes:[],edges:[],labels:[]}]; this.hptr=0;
+        this.setState({ mapImage, mapW:w, mapH:h, aerialChosen:true, createTab:'pos', nodes:[], edges:[], labels:[], areaDraft:[], labelEditor:null, labelDraftText:'', histIdx:0, histLen:1, penLast:null, penCursor:null, connectFrom:null });
         this._scheduleFit();
       };
       // Có server: upload ảnh, lưu URL (tránh nhồi data URL lớn vào session JSON).
@@ -1589,7 +1737,7 @@ class Component extends DCLogic {
     };
     img.src = url;
   }
-  clearOwner(){ this.setState({ ownerPos:null }); }
+  clearOwner(){ this.setState({ ownerPos:null }, ()=>{ if(this.state.screen==='owner') this._saveOwner(); }); }
   onExpiry(e){
     const v = e.target.value; const patch = { expiryChoice:v };
     // Khi chọn "Ngày cụ thể" mà chưa có ngày → mặc định 24h tới cho tiện.
@@ -1720,7 +1868,16 @@ class Component extends DCLogic {
         notfoundTitle:'Session not found', notfoundMsg:'The link is invalid or the session was deleted.', expiredTitle:'Session expired', expiredMsg:'This session is past its lifetime and can no longer be accessed.', deniedTitle:'Access denied', deniedMsg:'Invalid admin token. You cannot edit this session.', endedTitle:'Session ended', endedMsg:'The owner has ended this session.',
         expNever:'Never', min15:'15 minutes', min60:'1 hour', min240:'4 hours', min1440:'24 hours', min10080:'7 days', min43200:'30 days', expCustom:'Specific date…', expiryDateLabel:'Pick expiry date & time', errExpiryFuture:'Expiry must be in the future.', errExpiryNeeded:'Please pick an expiry date.', expiresOn:'Expires', mapClickAdd:'Click to add nodes · drag to pan', mapDragOwner:'Click / drag to set your position', mapPickViewer:'Click the map to set your start point', mapPan:'Drag to pan · scroll to zoom' },
     };
-    return D[this.state.lang];
+    const extra = this.state.lang==='vi' ? {
+      labelHelp:'Nhấn vị trí trên bản đồ để đặt tên; nhấn lại nhãn để sửa hoặc xóa.',
+      toolArea:'Vẽ vùng', areaHelp:'Nhấn từng đỉnh để vẽ vùng tự do. Nhấn lại đỉnh đầu hoặc Enter để đóng; Esc để hủy.', areaContinue:'Đã có đỉnh. Nhấn tiếp để thêm góc, đỉnh đầu hoặc Enter để đóng vùng.', areaNeedThree:'Vùng cần ít nhất 3 đỉnh.',
+      labelPointTitle:'Đặt tên vị trí', labelAreaTitle:'Đặt tên khu vực', labelEditTitle:'Sửa tên', labelPointHint:'Tên sẽ hiện cùng dấu pin trên bản đồ.', labelAreaHint:'Tên sẽ hiện ở giữa vùng đã vẽ.', labelNamePlaceholder:'Nhập tên…', labelSave:'Lưu', labelCancel:'Hủy', labelDelete:'Xóa', labelRequired:'Hãy nhập tên trước khi lưu.'
+    } : {
+      labelHelp:'Click a map location to name it. Click a label again to edit or remove it.',
+      toolArea:'Draw area', areaHelp:'Click each corner to draw a free-form area. Click the first point or press Enter to close; Esc cancels.', areaContinue:'Keep adding corners, click the first point, or press Enter to close the area.', areaNeedThree:'An area needs at least 3 points.',
+      labelPointTitle:'Name location', labelAreaTitle:'Name area', labelEditTitle:'Edit name', labelPointHint:'The name appears with a pin marker on the map.', labelAreaHint:'The name appears at the center of the drawn area.', labelNamePlaceholder:'Enter a name…', labelSave:'Save', labelCancel:'Cancel', labelDelete:'Delete', labelRequired:'Enter a name before saving.'
+    };
+    return Object.assign(D[this.state.lang] || D.en, extra);
   }
 
   /* ---------------- render ---------------- */
@@ -1787,11 +1944,22 @@ class Component extends DCLogic {
     }).filter(Boolean);
     const nodesView = showNodes ? st.nodes.map(n=>{
       const sel = st.selNode === n.id, cf = st.connectFrom === n.id || st.penLast === n.id;
-      return { id:n.id, cx:n.xRatio*1000, cy:n.yRatio*vbH, r: sel||cf?9:6.5,
+      return { id:n.id, cx:n.xRatio*1000, cy:n.yRatio*vbH, r: sel||cf?6:4.2,
         fill: cf?'#f59e0b':(sel?'#dc2626':'#2563eb'),
         cursor: st.tool==='delete'?'not-allowed':(st.tool==='connect'||st.tool==='pen'?'crosshair':'grab'),
         onDown:(ev)=>this._nodeDown(n.id, ev) };
     }) : [];
+    const areasView = (st.labels||[]).filter(l=>Array.isArray(l.points) && l.points.length>=3).map(l=>({
+      id:l.id,
+      points:l.points.map(p=>(p.xRatio*1000)+' '+(p.yRatio*vbH)).join(' '),
+      fill:'rgba(220,38,38,.12)',
+      stroke:'rgba(220,38,38,.72)',
+      sw:1.8,
+      dash:'0'
+    }));
+    const areaDraftOn = (st.areaDraft||[]).length > 0;
+    const areaDraftPts = (st.areaDraft||[]).map(p=>(p.xRatio*1000)+' '+(p.yRatio*vbH)).join(' ');
+    const areaDraftNodes = (st.areaDraft||[]).map(p=>({ cx:p.xRatio*1000, cy:p.yRatio*vbH }));
     const searchView = showEdges ? st.searchSegs : []; // ẩn hoạt ảnh dò đường cho người xem
 
     // connectors (marker → nearest node)
@@ -1837,7 +2005,7 @@ class Component extends DCLogic {
 
     // ---- instruction chip ----
     let instruction = s.mapPan;
-    if(editingGraph) instruction = st.tool==='pen' ? (st.penLast?s.penContinue:s.penHelp) : st.tool==='connect' ? (st.connectFrom?s.connectHint:s.connectHelp) : st.tool==='label' ? s.labelHelp : s.mapClickAdd;
+    if(editingGraph) instruction = st.tool==='pen' ? (st.penLast?s.penContinue:s.penHelp) : st.tool==='connect' ? (st.connectFrom?s.connectHint:s.connectHelp) : st.tool==='label' ? s.labelHelp : st.tool==='area' ? (st.areaDraft.length?s.areaContinue:s.areaHelp) : s.mapClickAdd;
     else if(ownerPinDrag) instruction = s.mapDragOwner;
     else if(isViewer && st.picking) instruction = s.mapPickViewer;
 
@@ -1927,6 +2095,13 @@ class Component extends DCLogic {
       aerialCardStyle:`width:100%;display:flex;align-items:center;gap:13px;padding:12px;border-radius:13px;border:1.5px solid ${st.aerialChosen?'#dc2626':'#e2e8f0'};background:${st.aerialChosen?'#fffbfb':'#fff'};cursor:pointer;text-align:left;`,
       hasOwnerPos: !!st.ownerPos, ownerPosLabel, clearOwner:()=>this.clearOwner(),
       graphToolsBlock,
+      labelEditorOn:!!st.labelEditor,
+      labelEditorTitle:st.labelEditor && st.labelEditor.mode==='edit' ? s.labelEditTitle : (st.labelEditor && st.labelEditor.kind==='area' ? s.labelAreaTitle : s.labelPointTitle),
+      labelEditorHint:st.labelEditor && st.labelEditor.kind==='area' ? s.labelAreaHint : s.labelPointHint,
+      labelNamePlaceholder:s.labelNamePlaceholder, labelDraftText:st.labelDraftText, labelInputRef:this.labelInputRef,
+      onLabelDraft:(e)=>this.onLabelDraft(e), onLabelEditorKey:(e)=>this.onLabelEditorKey(e),
+      saveLabelEditor:()=>this.saveLabelEditor(), cancelLabelEditor:()=>this.cancelLabelEditor(), deleteLabelEditor:()=>this.deleteLabelEditor(),
+      canDeleteLabel:!!st.labelEditor && st.labelEditor.mode==='edit', labelSave:s.labelSave, labelCancel:s.labelCancel, labelDelete:s.labelDelete,
       notCreated: !st.created, created: st.created,
       expiryChoice:st.expiryChoice, onExpiry:(e)=>this.onExpiry(e), expiryOptions:expiryOptions.map(([v,t])=>({v,t})),
       expiryCustom: st.expiryChoice==='custom', expiryDate: st.expiryDate, onExpiryDate:(e)=>this.onExpiryDate(e), minDateTime: this._localDateTimeValue(st.now),
@@ -1955,16 +2130,22 @@ class Component extends DCLogic {
       mapImage:st.mapImage, imgRef:this.imgRef, viewBox:`0 0 1000 ${Math.round(vbH)}`, worldW: st.isMobile?520:760, worldAspect:`${st.mapW} / ${st.mapH}`,
       vpRef:this.vpRef, worldRef:this.worldRef, svgRef:this.svgRef, onImgLoad:()=>this._scheduleFit(),
       edgesView, nodesView, searchView, connectorsView, routePts, hasRoute,
-      labelsView: (st.labels||[]).map(l=>{ const area=!!l.wRatio; const cx=area?l.xRatio+l.wRatio/2:l.xRatio, cy=area?l.yRatio+l.hRatio/2:l.yRatio; return { id:l.id, text:l.text, l:cx*100, t:cy*100, stem:!area, tf: area?'translate(-50%,-50%) scale(calc(1/var(--z,1)))':'translate(-50%,-140%) scale(calc(1/var(--z,1)))' }; }),
-      areaLabels: (st.labels||[]).filter(l=>l.wRatio).map(l=>({ id:l.id, l:l.xRatio*100, t:l.yRatio*100, w:l.wRatio*100, h:l.hRatio*100 })),
-      regionDraftOn: !!st.regionDraft,
-      regionDraftL: st.regionDraft?st.regionDraft.x*100:0, regionDraftT: st.regionDraft?st.regionDraft.y*100:0,
-      regionDraftW: st.regionDraft?st.regionDraft.w*100:0, regionDraftH: st.regionDraft?st.regionDraft.h*100:0,
+      labelsView: (st.labels||[]).map(l=>{
+        const c = this._labelCenter(l), area = Array.isArray(l.points) || l.wRatio != null;
+        return { id:l.id, text:l.text, l:c.x*100, t:c.y*100, point:!area, stem:!area, tf: area?'translate(-50%,-50%) scale(calc(1/var(--z,1)))':'translate(-50%,-140%) scale(calc(1/var(--z,1)))' };
+      }),
+      areaLabels: (st.labels||[]).filter(l=>l.wRatio != null).map(l=>({ id:l.id, l:l.xRatio*100, t:l.yRatio*100, w:l.wRatio*100, h:l.hRatio*100 })),
+      areasView, areaDraftOn, areaDraftPts, areaDraftNodes,
+      penGuideOn: editingGraph && st.tool==='pen' && !!st.penLast && !!st.penCursor,
+      penGuideX1: st.penLast && nodeById[st.penLast] ? nodeById[st.penLast].xRatio*1000 : 0,
+      penGuideY1: st.penLast && nodeById[st.penLast] ? nodeById[st.penLast].yRatio*vbH : 0,
+      penGuideX2: st.penCursor ? st.penCursor.xRatio*1000 : 0,
+      penGuideY2: st.penCursor ? st.penCursor.yRatio*vbH : 0,
       hasOwnerPin, ownerPinL: st.ownerPos?st.ownerPos.xRatio*100:0, ownerPinT: st.ownerPos?st.ownerPos.yRatio*100:0,
       ownerPinCursor: ownerPinDrag?'grab':'default', ownerPinLive: st.ownerLive, onOwnerPinDown:(e)=>{ if(!ownerPinDrag) return; e.stopPropagation(); this.drag={mode:'owner',moved:false,x:e.clientX,y:e.clientY}; },
       hasViewerPin, viewerPinL: st.viewerPos?st.viewerPos.xRatio*100:0, viewerPinT: st.viewerPos?st.viewerPos.yRatio*100:0,
       viewerPinCursor: isViewer?'grab':'default', onViewerPinDown:(e)=>{ if(!isViewer) return; e.stopPropagation(); this.drag={mode:'viewer',moved:false,x:e.clientX,y:e.clientY}; },
-      stageCursor: (editingGraph&&(st.tool==='node'||st.tool==='pen'||st.tool==='label'))||ownerPinDrag||(isViewer&&st.picking) ? 'crosshair' : 'grab',
+      stageCursor: (editingGraph&&(st.tool==='node'||st.tool==='pen'||st.tool==='label'||st.tool==='area'))||ownerPinDrag||(isViewer&&st.picking) ? 'crosshair' : 'grab',
       zoomIn:()=>this.zoomIn(), zoomOut:()=>this.zoomOut(), zoomReset:()=>this.zoomReset(), zoomBtnStyle:zoomBtn,
       instructionLabel:instruction,
       // toast
@@ -1977,15 +2158,20 @@ class Component extends DCLogic {
   }
 
   /* graph tools as a React element (reused) */
+  setTool(tool){
+    this._penPendingCursor = null;
+    this._areaRedo = [];
+    this.setState({ tool, connectFrom:null, penLast:null, penCursor:null, areaDraft:[], labelEditor:null, labelDraftText:'' });
+  }
   _graphTools(s, editingGraph){
     const st = this.state;
     const R = React.createElement;
     const toolBtn = (key, label, icon) => {
       const active = st.tool === key;
-      return R('button', { key, onClick:()=>this.setState({ tool:key, connectFrom:null, penLast:null }),
-        style:{ display:'flex',flexDirection:'column',alignItems:'center',gap:5,padding:'11px 4px',borderRadius:11,
+      return R('button', { key, onClick:()=>this.setTool(key),
+        style:{ display:'flex',flexDirection:'column',alignItems:'center',gap:5,minWidth:0,overflow:'hidden',padding:'9px 2px',borderRadius:11,
           border:'1.5px solid '+(active?'#dc2626':'#e2e8f0'), background:active?'#fef2f2':'#fff', color:active?'#dc2626':'#475569',
-          fontWeight:700,fontSize:'.72rem',cursor:'pointer' } },
+          fontWeight:700,fontSize:'.66rem',cursor:'pointer',whiteSpace:'nowrap',textOverflow:'ellipsis' } },
         R('span',{ dangerouslySetInnerHTML:{ __html:icon }, style:{display:'grid',placeItems:'center'} }), label);
     };
     const icons = {
@@ -1993,10 +2179,11 @@ class Component extends DCLogic {
       connect:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.5 8.5l7 7"/></svg>',
       edit:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
       label:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H4a1 1 0 0 0-1 1v5a2 2 0 0 0 .59 1.42l9 9a2 2 0 0 0 2.82 0l5-5a2 2 0 0 0 0-2.82l-9-9A2 2 0 0 0 9 3z"/><circle cx="7.5" cy="7.5" r="1.3" fill="currentColor"/></svg>',
+      area:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 5h16l-3 14H7L4 5z"/><path d="M4 5l3 14M20 5l-3 14"/></svg>',
       delete:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>',
     };
     const penActive = st.tool === 'pen';
-    const penToggle = R('button',{ onClick:()=>this.setState({ tool: penActive?'node':'pen', connectFrom:null, penLast:null }),
+    const penToggle = R('button',{ onClick:()=>this.setTool(penActive?'edit':'pen'),
       style:{ width:'100%',display:'flex',alignItems:'center',gap:11,padding:'12px 14px',borderRadius:12,
         border:'1.5px solid '+(penActive?'#dc2626':'#e2e8f0'), background:penActive?'#fef2f2':'#fff', cursor:'pointer', textAlign:'left' } },
       R('span',{ style:{ width:34,height:34,flex:'none',borderRadius:9,display:'grid',placeItems:'center', background:penActive?'#dc2626':'#f1f5f9', color:penActive?'#fff':'#475569' },
@@ -2005,10 +2192,12 @@ class Component extends DCLogic {
         R('span',{ style:{ display:'block',fontWeight:800,fontSize:'.92rem',color:penActive?'#dc2626':'#0f172a' } }, s.toolPen),
         R('span',{ style:{ display:'block',fontSize:'.74rem',color:'#94a3b8' } }, penActive ? s.penOn : s.penHint)));
 
-    const grid = R('div',{ style:{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:7 } },
+    const grid = R('div',{ style:{ display:'grid',gridTemplateColumns:'repeat(6,minmax(0,1fr))',gap:6 } },
+      toolBtn('edit', s.toolEdit, icons.edit),
       toolBtn('node', s.toolNode, icons.node),
       toolBtn('connect', s.toolConnect, icons.connect),
       toolBtn('label', s.toolLabel, icons.label),
+      toolBtn('area', s.toolArea, icons.area),
       toolBtn('delete', s.toolDelete, icons.delete));
 
     // new-edge direction toggle
@@ -2020,7 +2209,7 @@ class Component extends DCLogic {
 
     // help / connect hint
     const help = R('p',{ style:{ fontSize:'.8rem',color:'#94a3b8',lineHeight:1.5,margin:'2px 0' } },
-      st.tool==='pen' ? (st.penLast?s.penContinue:s.penHelp) : st.tool==='connect' ? (st.connectFrom?s.connectHint:s.connectHelp) : st.tool==='label' ? s.labelHelp : s.showHelp);
+      st.tool==='pen' ? (st.penLast?s.penContinue:s.penHelp) : st.tool==='connect' ? (st.connectFrom?s.connectHint:s.connectHelp) : st.tool==='label' ? s.labelHelp : st.tool==='area' ? (st.areaDraft.length?s.areaContinue:s.areaHelp) : s.showHelp);
 
     // stats
     const stats = R('div',{ style:{ display:'flex',gap:10 } },

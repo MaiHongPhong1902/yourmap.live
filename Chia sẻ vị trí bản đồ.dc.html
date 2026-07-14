@@ -471,17 +471,21 @@ window.MSNet = (function () {
               </defs>
               <!-- free-form areas and drawing previews -->
               <sc-for list="{{ areasView }}" as="ar" hint-placeholder-count="0">
-                <polygon points="0 0 0 0" data-dc-bind-points="{{ ar.points }}" fill="{{ ar.fill }}" stroke="{{ ar.stroke }}" stroke-width="{{ ar.sw }}" stroke-dasharray="{{ ar.dash }}" vector-effect="non-scaling-stroke" style="pointer-events:none;"></polygon>
+                <path d="M 0 0" data-dc-bind-d="{{ ar.d }}" fill="{{ ar.fill }}" stroke="{{ ar.stroke }}" stroke-width="{{ ar.sw }}" stroke-dasharray="{{ ar.dash }}" vector-effect="non-scaling-stroke" style="pointer-events:none;"></path>
               </sc-for>
               <sc-if value="{{ areaDraftOn }}" hint-placeholder-val="{{ false }}">
-                <polygon points="0 0 0 0" data-dc-bind-points="{{ areaDraftPts }}" fill="rgba(220,38,38,.12)" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 5" vector-effect="non-scaling-stroke" style="pointer-events:none;"></polygon>
+                <path d="M 0 0" data-dc-bind-d="{{ areaDraftD }}" fill="rgba(220,38,38,.12)" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 5" vector-effect="non-scaling-stroke" style="pointer-events:none;"></path>
                 <sc-for list="{{ areaDraftNodes }}" as="p" hint-placeholder-count="0">
                   <circle cx="0" cy="0" data-dc-bind-cx="{{ p.cx }}" data-dc-bind-cy="{{ p.cy }}" r="7" fill="#fff" stroke="#dc2626" stroke-width="2" vector-effect="non-scaling-stroke" style="pointer-events:none;"></circle>
                 </sc-for>
               </sc-if>
+              <sc-if value="{{ areaPreviewOn }}" hint-placeholder-val="{{ false }}">
+                <path d="M 0 0" data-dc-bind-d="{{ areaPreviewD }}" fill="none" stroke="#f59e0b" stroke-width="3" stroke-dasharray="8 5" stroke-linecap="round" vector-effect="non-scaling-stroke" style="pointer-events:none;"></path>
+                <circle cx="0" cy="0" data-dc-bind-cx="{{ areaPreviewCx }}" data-dc-bind-cy="{{ areaPreviewCy }}" r="7" fill="#fff" stroke="#f59e0b" stroke-width="2" vector-effect="non-scaling-stroke" style="pointer-events:none;"></circle>
+              </sc-if>
               <!-- base edges -->
               <sc-for list="{{ edgesView }}" as="e" hint-placeholder-count="0">
-                <line x1="0" y1="0" x2="0" y2="0" data-dc-bind-x1="{{ e.x1 }}" data-dc-bind-y1="{{ e.y1 }}" data-dc-bind-x2="{{ e.x2 }}" data-dc-bind-y2="{{ e.y2 }}" stroke="{{ e.color }}" stroke-width="{{ e.w }}" stroke-linecap="round" stroke-dasharray="{{ e.dash }}" marker-end="{{ e.marker }}" vector-effect="non-scaling-stroke" style="cursor:{{ e.cursor }};filter:{{ e.filter }};" onClick="{{ e.onClick }}"></line>
+                <path d="M 0 0" data-dc-bind-d="{{ e.d }}" fill="none" stroke="{{ e.color }}" stroke-width="{{ e.w }}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="{{ e.dash }}" marker-end="{{ e.marker }}" vector-effect="non-scaling-stroke" style="cursor:{{ e.cursor }};filter:{{ e.filter }};" onClick="{{ e.onClick }}"></path>
               </sc-for>
               <!-- search animation -->
               <sc-for list="{{ searchView }}" as="v" hint-placeholder-count="0">
@@ -493,14 +497,17 @@ window.MSNet = (function () {
               </sc-for>
               <!-- route -->
               <sc-if value="{{ hasRoute }}" hint-placeholder-val="{{ false }}">
-                <polyline points="" data-dc-bind-points="{{ routePts }}" fill="none" stroke="#dc2626" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" marker-mid="url(#arrow)" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));"></polyline>
-                <polyline points="" data-dc-bind-points="{{ routePts }}" fill="none" stroke="#fca5a5" stroke-width="2" stroke-dasharray="6 10" stroke-linecap="round" vector-effect="non-scaling-stroke" style="animation:dashflow 1s linear infinite;"></polyline>
+                <path d="M 0 0" data-dc-bind-d="{{ routePathD }}" fill="none" stroke="#dc2626" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" marker-mid="url(#arrow)" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));"></path>
+                <path d="M 0 0" data-dc-bind-d="{{ routePathD }}" fill="none" stroke="#fca5a5" stroke-width="2" stroke-dasharray="6 10" stroke-linecap="round" vector-effect="non-scaling-stroke" style="animation:dashflow 1s linear infinite;"></path>
               </sc-if>
               <!-- nodes -->
               <sc-for list="{{ nodesView }}" as="n" hint-placeholder-count="0">
                 <circle cx="0" cy="0" data-dc-bind-cx="{{ n.cx }}" data-dc-bind-cy="{{ n.cy }}" r="16" fill="transparent" style="cursor:{{ n.cursor }};" onPointerDown="{{ n.onDown }}"></circle>
                 <circle cx="0" cy="0" r="4" data-dc-bind-cx="{{ n.cx }}" data-dc-bind-cy="{{ n.cy }}" data-dc-bind-r="{{ n.r }}" fill="{{ n.fill }}" stroke="#fff" stroke-width="1.7" vector-effect="non-scaling-stroke" style="cursor:{{ n.cursor }};pointer-events:none;"></circle>
               </sc-for>
+              <sc-if value="{{ penPreviewOn }}" hint-placeholder-val="{{ false }}">
+                <path d="M 0 0" data-dc-bind-d="{{ penPreviewD }}" fill="none" stroke="#f59e0b" stroke-width="3" stroke-dasharray="8 5" stroke-linecap="round" vector-effect="non-scaling-stroke" style="pointer-events:none;"></path>
+              </sc-if>
               <sc-if value="{{ penGuideOn }}" hint-placeholder-val="{{ false }}">
                 <line x1="0" y1="0" x2="0" y2="0" data-dc-bind-x1="{{ penGuideX1 }}" data-dc-bind-y1="{{ penGuideY1 }}" data-dc-bind-x2="{{ penGuideX2 }}" data-dc-bind-y2="{{ penGuideY2 }}" stroke="#f59e0b" stroke-width="2" stroke-dasharray="7 6" vector-effect="non-scaling-stroke" style="pointer-events:none;"></line>
               </sc-if>
@@ -660,6 +667,9 @@ class Component extends DCLogic {
     this.imgRef = React.createRef();
     this.labelInputRef = React.createRef();
     this._penPendingCursor = null;
+    this._pendingGesturePreview = null;
+    this._curvePreviewFrame = null;
+    this._spaceHeld = false;
     // viewport transform (imperative — not in state to avoid re-render churn)
     this.tx = 0; this.ty = 0; this.sc = 1;
     this.peerId = Math.random().toString(36).slice(2,10);
@@ -672,14 +682,14 @@ class Component extends DCLogic {
       mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048,
       nodes:[], edges:[], labels:[], areaDraft:[], labelEditor:null, labelDraftText:'',
       tool:'pen', newBidir:true,
-      connectFrom:null, selNode:null, selEdge:null, penLast:null, penCursor:null,
+      connectFrom:null, selNode:null, selEdge:null, penLast:null, penCursor:null, penPreview:null, areaPreview:null, spacePan:false,
       histIdx:0, histLen:1,
       createTab:'map', aerialChosen:false,
       token:null, ownerToken:null, created:false,
       ownerPos:null, ownerLocked:false, ownerLive:false,
       expiryChoice:'60', expiryDate:'', usePassword:false, password:'',
       viewerPos:null, picking:false, gpsSupported:false,
-      route:null, routeDist:0, routeHops:0, routeError:null,
+      route:null, routeParts:null, routeDist:0, routeHops:0, routeError:null,
       searchSegs:[], searchStep:0,
       viewerCount:0, now:Date.now(), expiresAt:null,
       toast:null, isMobile: window.innerWidth < 860,
@@ -701,6 +711,19 @@ class Component extends DCLogic {
       const target = e.target;
       const typing = !!target && (['INPUT','TEXTAREA','SELECT'].includes(target.tagName) || target.isContentEditable);
       const graphEditing = this.state.screen === 'graph' || (this.state.screen === 'create' && this.state.createTab === 'graph');
+      if(!typing && e.code === 'Space' && ['create','graph','owner','viewer'].includes(this.state.screen)){
+        e.preventDefault();
+        if(!this._spaceHeld){
+          this._spaceHeld = true;
+          const d = this.drag;
+          if(d && (d.mode === 'pen-anchor' || d.mode === 'area-anchor')){
+            this.drag = { mode:'space-pan', x:d.lastX || d.x, y:d.lastY || d.y, ox:this.tx, oy:this.ty, moved:false };
+            this._clearGesturePreview();
+          }
+          this.setState({ spacePan:true, penPreview:null, areaPreview:null });
+        }
+        return;
+      }
       const mod = e.ctrlKey || e.metaKey;
       if(!typing && graphEditing && mod && key === 'z'){
         e.preventDefault();
@@ -725,11 +748,19 @@ class Component extends DCLogic {
       }
       if(e.key === 'Escape'){
         if(this.state.labelEditor){ this.cancelLabelEditor(); return; }
-        if((this.state.areaDraft||[]).length){ this._areaRedo=[]; this.setState({ areaDraft:[] }); return; }
+        if((this.state.areaDraft||[]).length){ this._areaRedo=[]; this._clearGesturePreview(); this.setState({ areaDraft:[] }); return; }
+        if(this.state.penLast || this.state.connectFrom) this._clearGesturePreview();
         if(this.state.penLast || this.state.connectFrom) this.setState({ penLast:null, penCursor:null, connectFrom:null });
       }
     };
+    this._onKeyUp = (e) => {
+      if(e.code !== 'Space') return;
+      this._spaceHeld = false;
+      if(this.drag && this.drag.mode === 'space-pan') this.drag = null;
+      this.setState({ spacePan:false, penPreview:null, areaPreview:null });
+    };
     window.addEventListener('keydown', this._onKey);
+    window.addEventListener('keyup', this._onKeyUp);
     // pointer + wheel on viewport
     this._bindStage();
     this._tick = setInterval(() => {
@@ -746,9 +777,13 @@ class Component extends DCLogic {
     window.removeEventListener('resize', this._onResize);
     window.removeEventListener('hashchange', this._onHash);
     window.removeEventListener('keydown', this._onKey);
+    window.removeEventListener('keyup', this._onKeyUp);
     clearInterval(this._tick);
     if(this._penGuideFrame) cancelAnimationFrame(this._penGuideFrame);
+    if(this._curvePreviewFrame) cancelAnimationFrame(this._curvePreviewFrame);
     this._penPendingCursor = null;
+    this._pendingGesturePreview = null;
+    this._spaceHeld = false;
     this._teardownChannel();
   }
   _syncMapImg(){
@@ -834,10 +869,10 @@ class Component extends DCLogic {
       token, ownerToken: otoken || null,
       mapImage: sess.mapImage, mapW: sess.mapW, mapH: sess.mapH,
       nodes: sess.nodes || [], edges: sess.edges || [], labels: sess.labels || [],
-      histIdx:0, histLen:1, penLast:null, penCursor:null, connectFrom:null, areaDraft:[], labelEditor:null, labelDraftText:'',
+      histIdx:0, histLen:1, penLast:null, penCursor:null, penPreview:null, areaPreview:null, connectFrom:null, areaDraft:[], labelEditor:null, labelDraftText:'',
       ownerPos: sess.ownerPos || null, ownerLocked: !!sess.ownerLocked,
       expiresAt: sess.expiresAt || null,
-      route:null, routeError:null, searchSegs:[], viewerPos:null, picking:false, ownerLive:false,
+      route:null, routeParts:null, routeError:null, searchSegs:[], viewerPos:null, picking:false, ownerLive:false,
     });
   }
   _nav(hash){ location.hash = hash; }
@@ -877,7 +912,7 @@ class Component extends DCLogic {
     this._penPendingCursor = null;
     this._areaRedo = [];
     const c = this._snap(this.hist[this.hptr].nodes, this.hist[this.hptr].edges, this.hist[this.hptr].labels);
-    this.setState({ nodes:c.nodes, edges:c.edges, labels:c.labels, areaDraft:[], labelEditor:null, histIdx:this.hptr, histLen:this.hist.length, selNode:null, selEdge:null, connectFrom:null, penLast:null, penCursor:null, route:null, searchSegs:[] });
+    this.setState({ nodes:c.nodes, edges:c.edges, labels:c.labels, areaDraft:[], labelEditor:null, histIdx:this.hptr, histLen:this.hist.length, selNode:null, selEdge:null, connectFrom:null, penLast:null, penCursor:null, penPreview:null, areaPreview:null, route:null, routeParts:null, searchSegs:[] });
     this._save({ nodes:c.nodes, edges:c.edges, labels:c.labels });
     this._send({type:'graph', nodes:c.nodes, edges:c.edges, labels:c.labels});
     this._pushServer({ nodes:c.nodes, edges:c.edges, labels:c.labels });
@@ -1100,9 +1135,24 @@ class Component extends DCLogic {
         wx:(mx - this.tx)/this.sc, wy:(my - this.ty)/this.sc };
       return;
     }
-    if(e.target.closest('[data-pin]') || e.target.tagName === 'circle') return; // handled by element
     const st = this.state;
+    if(this._spaceHeld || st.spacePan){
+      this._clearGesturePreview();
+      this.drag = { mode:'space-pan', x:e.clientX, y:e.clientY, ox:this.tx, oy:this.ty, moved:false };
+      return;
+    }
+    if(e.target.closest('[data-pin]') || e.target.tagName === 'circle') return; // handled by element
     const editingGraph = st.screen === 'graph' || (st.screen === 'create' && st.createTab === 'graph');
+    if(editingGraph && (st.tool === 'pen' || st.tool === 'area')){
+      const anchor = this._ratio(e.clientX, e.clientY);
+      this.drag = { mode:st.tool==='pen'?'pen-anchor':'area-anchor', anchor, x:e.clientX, y:e.clientY, lastX:e.clientX, lastY:e.clientY, moved:false };
+      this._clearGesturePreview();
+      this.setState({
+        penPreview:st.tool==='pen' && !!st.penLast ? { anchor, curve:null } : null,
+        areaPreview:st.tool==='area' && (st.areaDraft||[]).length ? { anchor, curveFrom:null } : null,
+      });
+      return;
+    }
     this.drag = { mode:'pan', x:e.clientX, y:e.clientY, ox:this.tx, oy:this.ty, moved:false };
   }
   _pointerMove(e){
@@ -1118,7 +1168,10 @@ class Component extends DCLogic {
       this.sc = ns; this.tx = mx - this._pinch.wx*ns; this.ty = my - this._pinch.wy*ns; this._applyTransform();
       return;
     }
-    if(this.state.tool === 'pen' && this.state.penLast){
+    const d = this.drag;
+    if(d){ d.lastX = e.clientX; d.lastY = e.clientY; }
+    if(!d || (d.mode !== 'pen-anchor' && d.mode !== 'area-anchor' && d.mode !== 'space-pan')){
+      if(!this._spaceHeld && !this.state.spacePan && this.state.tool === 'pen' && this.state.penLast){
       const r = this._ratio(e.clientX, e.clientY);
       this._penPendingCursor = r;
       if(!this._penGuideFrame){
@@ -1128,20 +1181,56 @@ class Component extends DCLogic {
           if(this.state.tool === 'pen' && this.state.penLast && cursor) this.setState({ penCursor:cursor });
         });
       }
+      }
     }
-    const d = this.drag; if(!d) return;
+    if(!d) return;
     const dx = e.clientX - d.x, dy = e.clientY - d.y;
     if(Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
-    if(d.mode === 'pan'){ this.tx = d.ox + dx; this.ty = d.oy + dy; this._applyTransform(); }
+    if(d.mode === 'pan' || d.mode === 'space-pan'){ this.tx = d.ox + dx; this.ty = d.oy + dy; this._applyTransform(); }
     else if(d.mode === 'node'){ const r = this._ratio(e.clientX, e.clientY); this._updateNode(d.id, r); }
     else if(d.mode === 'owner'){ const r = this._ratio(e.clientX, e.clientY); this.setState({ ownerPos:r }); }
     else if(d.mode === 'viewer'){ const r = this._ratio(e.clientX, e.clientY); this.setState({ viewerPos:r }); }
+    else if(d.mode === 'pen-anchor' || d.mode === 'area-anchor') this._queueGesturePreview(d, e.clientX, e.clientY);
+  }
+  _queueGesturePreview(d, clientX, clientY){
+    this._pendingGesturePreview = { drag:d, clientX, clientY };
+    if(this._curvePreviewFrame) return;
+    const schedule = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (fn)=>setTimeout(fn, 0);
+    this._curvePreviewFrame = schedule(()=>{
+      this._curvePreviewFrame = null;
+      const pending = this._pendingGesturePreview;
+      this._pendingGesturePreview = null;
+      if(!pending || this.drag !== pending.drag || this._spaceHeld || this.state.spacePan) return;
+      const curve = this._curveFromGesture(pending.drag.anchor, pending.clientX, pending.clientY);
+      if(pending.drag.mode === 'pen-anchor' && this.state.penLast){
+        this.setState({ penPreview:{ anchor:pending.drag.anchor, curve } });
+      } else if(pending.drag.mode === 'area-anchor' && (this.state.areaDraft||[]).length){
+        this.setState({ areaPreview:{ anchor:pending.drag.anchor, curveFrom:curve } });
+      }
+    });
+  }
+  _clearGesturePreview(){
+    this._pendingGesturePreview = null;
+    if(this._curvePreviewFrame){
+      const cancel = typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : clearTimeout;
+      cancel(this._curvePreviewFrame);
+      this._curvePreviewFrame = null;
+    }
+    if(this.state.penPreview || this.state.areaPreview) this.setState({ penPreview:null, areaPreview:null });
   }
   _pointerUp(e){
     if(this._ptrs) delete this._ptrs[e.pointerId];
     const remaining = this._ptrs ? Object.keys(this._ptrs).length : 0;
     if(this._pinch){ if(remaining < 2){ this._pinch = null; this.drag = null; } return; }
     const d = this.drag; this.drag = null; if(!d) return;
+    if(d.mode === 'pen-anchor' || d.mode === 'area-anchor'){
+      this._clearGesturePreview();
+      const curved = d.moved ? this._curveFromGesture(d.anchor, e.clientX, e.clientY) : null;
+      if(d.mode === 'pen-anchor') this._penClick(d.anchor, { curve: this.state.penLast && curved ? curved : null });
+      else this._areaClick(d.anchor, this.state.areaDraft.length && curved ? curved : null);
+      return;
+    }
+    if(d.mode === 'space-pan') return;
     if(d.mode === 'pan' && !d.moved){ this._mapClick(e); }
     else if(d.mode === 'node' && d.moved){ this._applyGraph(this.state.nodes, this.state.edges); }
     else if(d.mode === 'owner' && d.moved){ this._saveOwner(); }
@@ -1257,7 +1346,7 @@ class Component extends DCLogic {
   }
   _addAreaLabel(points){
     if(!Array.isArray(points) || points.length < 3) return;
-    this._openLabelEditor({ kind:'area', points:points.map(p=>({xRatio:p.xRatio,yRatio:p.yRatio})) });
+    this._openLabelEditor({ kind:'area', points:points.map(p=>({ xRatio:p.xRatio, yRatio:p.yRatio, ...(p.curveFrom ? { curveFrom:{ xRatio:p.curveFrom.xRatio, yRatio:p.curveFrom.yRatio } } : {}) })) });
   }
   _openLabelEditor(opts){
     const label = opts && opts.label;
@@ -1287,7 +1376,7 @@ class Component extends DCLogic {
       labels = labels.map(l => l.id===ed.id ? {...l, text} : l);
     } else {
       const next = { id:(ed.kind==='area'?'r':'l') + this._rid(4), text };
-      if(ed.kind === 'area') next.points = (ed.points||[]).map(p=>({xRatio:p.xRatio,yRatio:p.yRatio}));
+      if(ed.kind === 'area') next.points = (ed.points||[]).map(p=>({ xRatio:p.xRatio, yRatio:p.yRatio, ...(p.curveFrom ? { curveFrom:{ xRatio:p.curveFrom.xRatio, yRatio:p.curveFrom.yRatio } } : {}) }));
       else { next.xRatio = ed.xRatio; next.yRatio = ed.yRatio; }
       labels = labels.concat([next]);
     }
@@ -1298,7 +1387,7 @@ class Component extends DCLogic {
     if(ed && ed.mode === 'edit') this._deleteLabel(ed.id);
     this.setState({ labelEditor:null, labelDraftText:'' });
   }
-  _areaClick(r){
+  _areaClick(r, curveFrom){
     const draft = this.state.areaDraft || [];
     if(draft.length >= 3){
       const first = draft[0];
@@ -1306,7 +1395,9 @@ class Component extends DCLogic {
       if(closeDist < 28){ this._finishArea(); return; }
     }
     this._areaRedo = [];
-    this.setState({ areaDraft:draft.concat([{xRatio:r.xRatio,yRatio:r.yRatio}]) });
+    const point = { xRatio:r.xRatio, yRatio:r.yRatio };
+    if(curveFrom) point.curveFrom = { xRatio:curveFrom.xRatio, yRatio:curveFrom.yRatio };
+    this.setState({ areaDraft:draft.concat([point]) });
   }
   _undoAreaPoint(){
     const draft = this.state.areaDraft || [];
@@ -1343,6 +1434,10 @@ class Component extends DCLogic {
   _nodeDown(id, e){
     e.stopPropagation();
     const st = this.state;
+    if(this._spaceHeld || st.spacePan){
+      this.drag = { mode:'space-pan', x:e.clientX, y:e.clientY, ox:this.tx, oy:this.ty, moved:false };
+      return;
+    }
     if(st.tool === 'delete'){ this._deleteNode(id); return; }
     if(st.tool === 'connect'){ this._connectPick(id); return; }
     if(st.tool === 'pen'){ this._penClick(this._ratio(e.clientX, e.clientY)); return; }
@@ -1352,8 +1447,9 @@ class Component extends DCLogic {
     this.drag = { mode:'node', id, moved:false, x:e.clientX, y:e.clientY };
   }
   // Pen tool: click to lay a continuous path — each click adds/snaps a node and links it to the previous one.
-  _penClick(r){
+  _penClick(r, opts){
     const st = this.state;
+    const curve = opts && opts.curve;
     let nodes = st.nodes.slice(), edges = st.edges.slice();
     const nodeById = {}; nodes.forEach(n=>nodeById[n.id]=n);
     const nearNode = this._nearestNode(r);
@@ -1369,6 +1465,7 @@ class Component extends DCLogic {
       const a = nodeById[e.from], b = nodeById[e.to];
       nodes.push({ id:targetId, xRatio:pos.xRatio, yRatio:pos.yRatio });
       const nn = { xRatio:pos.xRatio, yRatio:pos.yRatio };
+      nodeById[targetId] = nodes[nodes.length-1];
       edges = edges.filter(x=>x.id!==e.id).concat([
         { id:'e'+this._rid(4), from:e.from, to:targetId, weight:Math.round(this._dist(a,nn)), bidirectional:e.bidirectional, blocked:e.blocked },
         { id:'e'+this._rid(4), from:targetId, to:e.to, weight:Math.round(this._dist(nn,b)), bidirectional:e.bidirectional, blocked:e.blocked },
@@ -1376,12 +1473,18 @@ class Component extends DCLogic {
     } else {
       targetId = 'n' + this._rid(4);
       nodes.push({ id:targetId, xRatio:r.xRatio, yRatio:r.yRatio });
+      nodeById[targetId] = nodes[nodes.length-1];
     }
     // link from the previous anchor
     const last = st.penLast;
     if(last && last !== targetId && !edges.some(e=>(e.from===last&&e.to===targetId)||(e.from===targetId&&e.to===last))){
       const A = nodeById[last] || nodes.find(n=>n.id===last), B = nodes.find(n=>n.id===targetId);
-      if(A && B) edges.push({ id:'e'+this._rid(4), from:last, to:targetId, weight:Math.round(this._dist(A,B)), bidirectional:st.newBidir, blocked:false });
+      if(A && B){
+        const next = { id:'e'+this._rid(4), from:last, to:targetId, bidirectional:st.newBidir, blocked:false };
+        if(curve) next.curve = curve;
+        next.weight = Math.round(curve ? this._edgeLength(next, nodeById) : this._dist(A,B));
+        edges.push(next);
+      }
     }
     this._applyGraph(nodes, edges, { penLast:targetId, penCursor:null, selNode:targetId, selEdge:null });
   }
@@ -1429,12 +1532,140 @@ class Component extends DCLogic {
   }
   _edgeClick(id, e){
     if(e) e.stopPropagation();
+    if(this.state.tool === 'pen'){ this._penClick(this._ratio(e.clientX, e.clientY)); return; }
+    if(this.state.tool === 'area'){ this._areaClick(this._ratio(e.clientX, e.clientY)); return; }
     if(this.state.tool === 'delete'){ this.setState({ edges:this.state.edges.filter(x=>x.id!==id), selEdge:null }, ()=>this._saveGraph()); return; }
     this.setState({ selEdge:id, selNode:null });
   }
   _patchEdge(id, patch){ const edges = this.state.edges.map(e => e.id===id ? {...e, ...patch} : e); this.setState({ edges }, ()=>this._saveGraph()); }
   _dist(a,b){ const dx=(a.xRatio-b.xRatio)*1000, dy=(a.yRatio-b.yRatio)*this._vbH(); return Math.sqrt(dx*dx+dy*dy); }
   _vbH(){ return 1000 * this.state.mapH / this.state.mapW; }
+  _viewPoint(p){ return { x:p.xRatio*1000, y:p.yRatio*this._vbH() }; }
+  _ratioFromView(p){ return { xRatio:p.x/1000, yRatio:p.y/this._vbH() }; }
+  _clamp(v, min, max){ return Math.min(max, Math.max(min, v)); }
+  _quadPoint(a, c, b, t){
+    const u = 1 - t;
+    return { x:u*u*a.x + 2*u*t*c.x + t*t*b.x, y:u*u*a.y + 2*u*t*c.y + t*t*b.y };
+  }
+  _edgeControl(e){
+    return e && e.curve && e.curve.xRatio != null ? this._viewPoint(e.curve) : null;
+  }
+  _edgeSamples(e, nodeById, steps){
+    const a = nodeById[e.from], b = nodeById[e.to]; if(!a || !b) return [];
+    const A = this._viewPoint(a), B = this._viewPoint(b), C = this._edgeControl(e);
+    if(!C) return [A, B];
+    const out = [], count = steps || 24;
+    for(let i=0;i<=count;i++) out.push(this._quadPoint(A, C, B, i/count));
+    return out;
+  }
+  _edgePathD(e, a, b){
+    const A = this._viewPoint(a), B = this._viewPoint(b), C = this._edgeControl(e);
+    const f = (v)=>Number(v.toFixed(2));
+    return C ? `M ${f(A.x)} ${f(A.y)} Q ${f(C.x)} ${f(C.y)} ${f(B.x)} ${f(B.y)}` : `M ${f(A.x)} ${f(A.y)} L ${f(B.x)} ${f(B.y)}`;
+  }
+  _areaShapePoints(area){
+    if(Array.isArray(area && area.points) && area.points.length >= 3) return area.points;
+    if(area && area.wRatio != null && area.hRatio != null){
+      return [
+        { xRatio:area.xRatio, yRatio:area.yRatio },
+        { xRatio:area.xRatio+area.wRatio, yRatio:area.yRatio },
+        { xRatio:area.xRatio+area.wRatio, yRatio:area.yRatio+area.hRatio },
+        { xRatio:area.xRatio, yRatio:area.yRatio+area.hRatio },
+      ];
+    }
+    return [];
+  }
+  _areaPathD(area, closePath){
+    const points = this._areaShapePoints(area); if(!points.length) return '';
+    const f = (v)=>Number(v.toFixed(2));
+    let d = '';
+    points.forEach((point, i)=>{
+      const A = this._viewPoint(point);
+      if(i===0){ d = `M ${f(A.x)} ${f(A.y)}`; return; }
+      const C = point.curveFrom ? this._viewPoint(point.curveFrom) : null;
+      const B = A;
+      d += C ? ` Q ${f(C.x)} ${f(C.y)} ${f(B.x)} ${f(B.y)}` : ` L ${f(B.x)} ${f(B.y)}`;
+    });
+    if(closePath !== false && points.length >= 3){
+      const first = this._viewPoint(points[0]);
+      const closeControl = points[0].curveFrom ? this._viewPoint(points[0].curveFrom) : null;
+      d += closeControl ? ` Q ${f(closeControl.x)} ${f(closeControl.y)} ${f(first.x)} ${f(first.y)} Z` : ' Z';
+    }
+    return d;
+  }
+  _areaBoundarySamples(area, steps){
+    const points = this._areaShapePoints(area); if(points.length < 3) return [];
+    const out = [], count = steps || 12;
+    for(let i=0;i<points.length;i++){
+      const A = this._viewPoint(points[i]), next = points[(i+1)%points.length], B = this._viewPoint(next);
+      const C = next.curveFrom ? this._viewPoint(next.curveFrom) : null;
+      const n = C ? count : 1;
+      for(let j=0;j<n;j++) out.push(C ? this._quadPoint(A,C,B,j/n) : (j===0 ? A : B));
+    }
+    return out;
+  }
+  _partSamples(part, steps){
+    if(!part || !part.a || !part.b) return [];
+    const A = this._viewPoint(part.a), B = this._viewPoint(part.b), C = part.curve ? this._viewPoint(part.curve) : null;
+    const out = [], count = steps || 32;
+    for(let i=0;i<=count;i++) out.push(C ? this._quadPoint(A,C,B,i/count) : { x:A.x+(B.x-A.x)*i/count, y:A.y+(B.y-A.y)*i/count });
+    return out;
+  }
+  _routePathD(parts){
+    if(!Array.isArray(parts) || !parts.length) return '';
+    const f = (v)=>Number(v.toFixed(2));
+    let d = '', last = null;
+    parts.forEach(part=>{
+      const A = this._viewPoint(part.a), B = this._viewPoint(part.b), C = part.curve ? this._viewPoint(part.curve) : null;
+      if(!last || Math.hypot(last.x-A.x,last.y-A.y)>0.5) d += `M ${f(A.x)} ${f(A.y)}`;
+      d += C ? ` Q ${f(C.x)} ${f(C.y)} ${f(B.x)} ${f(B.y)}` : ` L ${f(B.x)} ${f(B.y)}`;
+      last = B;
+    });
+    return d;
+  }
+  _pointInPolygon(point, polygon){
+    if(!polygon || polygon.length < 3) return false;
+    let inside = false;
+    for(let i=0,j=polygon.length-1;i<polygon.length;j=i++){
+      const a=polygon[i], b=polygon[j];
+      const cross=(point.x-a.x)*(b.y-a.y)-(point.y-a.y)*(b.x-a.x);
+      const dot=(point.x-a.x)*(point.x-b.x)+(point.y-a.y)*(point.y-b.y);
+      if(Math.abs(cross)<1e-6 && dot<=1e-6) return true;
+      const hit=((a.y>point.y)!==(b.y>point.y)) && point.x < (b.x-a.x)*(point.y-a.y)/(b.y-a.y)+a.x;
+      if(hit) inside=!inside;
+    }
+    return inside;
+  }
+  _countAreaCrossings(routePoints, area){
+    const boundary = this._areaBoundarySamples(area, 16);
+    if(routePoints.length < 2 || boundary.length < 3) return 0;
+    let count = 0, wasInside = this._pointInPolygon(routePoints[0], boundary);
+    for(let i=1;i<routePoints.length;i++){
+      const isInside = this._pointInPolygon(routePoints[i], boundary);
+      if(isInside !== wasInside) count++;
+      wasInside = isInside;
+    }
+    return count;
+  }
+  _routeCrossings(parts, areas){
+    const points = [];
+    (parts||[]).forEach(part=>{
+      const samples = this._partSamples(part, 32);
+      samples.forEach((point, i)=>{ if(!i && points.length) return; points.push(point); });
+    });
+    return (areas||[]).map(area=>this._countAreaCrossings(points, area));
+  }
+  _edgeLength(e, nodeById){
+    const points = this._edgeSamples(e, nodeById, 32);
+    let total=0; for(let i=1;i<points.length;i++) total += Math.hypot(points[i].x-points[i-1].x, points[i].y-points[i-1].y);
+    return total;
+  }
+  _curveFromGesture(anchor, clientX, clientY){
+    const handle = this._viewPoint(this._ratio(clientX, clientY));
+    const A = this._viewPoint(anchor);
+    const C = { x:this._clamp(A.x-(handle.x-A.x), 0, 1000), y:this._clamp(A.y-(handle.y-A.y), 0, this._vbH()) };
+    return this._ratioFromView(C);
+  }
 
   // commit a graph change: auto-create intersection nodes where roads cross, then persist + push history
   _applyGraph(nodes, edges, extra){
@@ -1521,7 +1752,7 @@ class Component extends DCLogic {
         this._areaRedo = [];
         this.hist = [this._snap(nodes, edges, labels)]; this.hptr = 0;
         this.setState({
-          nodes, edges, labels, areaDraft:[], labelEditor:null, labelDraftText:'', histIdx:0, histLen:1, penLast:null, penCursor:null, connectFrom:null, selNode:null, selEdge:null,
+          nodes, edges, labels, areaDraft:[], labelEditor:null, labelDraftText:'', histIdx:0, histLen:1, penLast:null, penCursor:null, penPreview:null, areaPreview:null, connectFrom:null, selNode:null, selEdge:null,
           mapImage: d.mapImage || this.state.mapImage, mapW: d.mapW || this.state.mapW, mapH: d.mapH || this.state.mapH,
         }, ()=>this._saveGraph());
         this._scheduleFit();
@@ -1531,7 +1762,7 @@ class Component extends DCLogic {
     reader.readAsText(file);
     e.target.value = '';
   }
-  clearGraph(){ if(!this.state.nodes.length && !this.state.edges.length && !(this.state.labels||[]).length && !(this.state.areaDraft||[]).length && !this.state.labelEditor) return; this._areaRedo=[]; this.setState({ nodes:[], edges:[], labels:[], areaDraft:[], labelEditor:null, selNode:null, selEdge:null, connectFrom:null, penLast:null, penCursor:null, route:null, searchSegs:[] }, ()=>this._saveGraph()); this._toast(this.L().graphCleared); }
+  clearGraph(){ if(!this.state.nodes.length && !this.state.edges.length && !(this.state.labels||[]).length && !(this.state.areaDraft||[]).length && !this.state.labelEditor) return; this._areaRedo=[]; this.setState({ nodes:[], edges:[], labels:[], areaDraft:[], labelEditor:null, selNode:null, selEdge:null, connectFrom:null, penLast:null, penCursor:null, penPreview:null, areaPreview:null, route:null, routeParts:null, searchSegs:[] }, ()=>this._saveGraph()); this._toast(this.L().graphCleared); }
 
   /* ---------------- A* pathfinding ---------------- */
   _nearestNode(pt){
@@ -1546,14 +1777,15 @@ class Component extends DCLogic {
     const px = pt.xRatio*1000, py = pt.yRatio*vbH;
     let best=null, bd=Infinity;
     for(const e of this.state.edges){
-      const a=nodeById[e.from], b=nodeById[e.to]; if(!a||!b) continue;
-      const ax=a.xRatio*1000, ay=a.yRatio*vbH, bx=b.xRatio*1000, by=b.yRatio*vbH;
-      const dx=bx-ax, dy=by-ay, len2=dx*dx+dy*dy;
-      let t = len2>0 ? ((px-ax)*dx+(py-ay)*dy)/len2 : 0;
-      t = Math.max(0, Math.min(1, t));
-      const qx=ax+t*dx, qy=ay+t*dy;
-      const d=Math.sqrt((px-qx)*(px-qx)+(py-qy)*(py-qy));
-      if(d<bd){ bd=d; best={ edge:e, dist:d, t, proj:{ xRatio:qx/1000, yRatio:qy/vbH } }; }
+      const samples = this._edgeSamples(e, nodeById, 24); if(samples.length < 2) continue;
+      for(let i=1;i<samples.length;i++){
+        const a=samples[i-1], b=samples[i], dx=b.x-a.x, dy=b.y-a.y, len2=dx*dx+dy*dy;
+        let t = len2>0 ? ((px-a.x)*dx+(py-a.y)*dy)/len2 : 0;
+        t = Math.max(0, Math.min(1, t));
+        const qx=a.x+t*dx, qy=a.y+t*dy;
+        const d=Math.sqrt((px-qx)*(px-qx)+(py-qy)*(py-qy));
+        if(d<bd){ bd=d; best={ edge:e, dist:d, t, proj:{ xRatio:qx/1000, yRatio:qy/vbH } }; }
+      }
     }
     return best;
   }
@@ -1574,12 +1806,13 @@ class Component extends DCLogic {
   }
   _adjacency(){
     const adj = {};
+    const nodeById = {}; this.state.nodes.forEach(n=>nodeById[n.id]=n);
     for(const n of this.state.nodes) adj[n.id] = [];
     for(const e of this.state.edges){
       if(e.blocked) continue;
-      const w = e.weight != null ? e.weight : 1;
-      adj[e.from] && adj[e.from].push({ to:e.to, w });
-      if(e.bidirectional) adj[e.to] && adj[e.to].push({ to:e.from, w });
+      const w = e.weight != null ? e.weight : this._edgeLength(e, nodeById);
+      adj[e.from] && adj[e.from].push({ to:e.to, w, edge:e });
+      if(e.bidirectional) adj[e.to] && adj[e.to].push({ to:e.from, w, edge:e });
     }
     return adj;
   }
@@ -1623,11 +1856,13 @@ class Component extends DCLogic {
    * nới ra toàn bộ ứng viên (giữ kết nối, tránh báo "không tìm thấy đường").
    */
   _bestRoute(vp, op){
+    this._routeAreaBlocked = false;
     const nodes = this.state.nodes;
     if(nodes.length < 1) return null;
     const K = 8;               // số node ứng viên gần nhất xét cho điểm vào/ra
     const ENTRY_MAX_RATIO = 2; // điểm vào không được xa hơn 2× điểm gần nhất
     const nodeById = {}; nodes.forEach(n=>nodeById[n.id]=n);
+    const areas = (this.state.labels||[]).filter(area=>this._areaShapePoints(area).length>=3);
     const nearestK = (pt)=> nodes.map(n=>({ id:n.id, d:this._dist(n, pt) })).sort((a,b)=>a.d-b.d).slice(0, K);
     const startAll = nearestK(vp);
     const goalCands = {}; nearestK(op).forEach(c=>{ goalCands[c.id] = c.d; });
@@ -1636,35 +1871,67 @@ class Component extends DCLogic {
     const nearest = startAll.length ? startAll[0].d : 0;
     const startNear = startAll.filter(c => c.d <= nearest * ENTRY_MAX_RATIO);
 
+    const point = (p)=>({ xRatio:p.xRatio, yRatio:p.yRatio });
+    const edgePart = (edge, fromId, toId)=>{
+      const a=nodeById[fromId], b=nodeById[toId];
+      return { a:point(a), b:point(b), curve:edge && edge.curve ? point(edge.curve) : null };
+    };
+    const addCrossings = (base, delta)=>{
+      const next = base.slice();
+      for(let i=0;i<delta.length;i++){ next[i] += delta[i]; if(next[i] > 1) return null; }
+      return next;
+    };
+    const keyFor = (id, counts)=>id+'|'+counts.join(',');
     const run = (startCands)=>{
-      const g = {}, came = {}, segs = [];
+      const g = {}, came = {}, cameEdge = {}, info = {}, segs = [];
       const open = new Set();
-      for(const c of startCands){ g[c.id] = c.d; open.add(c.id); } // chi phí vào = khoảng cách thẳng từ người xem
+      for(const c of startCands){
+        const startPart = { a:point(vp), b:point(nodeById[c.id]), curve:null };
+        const counts = addCrossings(new Array(areas.length).fill(0), this._routeCrossings([startPart], areas));
+        if(!counts){ this._routeAreaBlocked = true; continue; }
+        const key = keyFor(c.id, counts);
+        if(g[key] == null || c.d < g[key]){
+          g[key] = c.d; open.add(key); info[key] = { id:c.id, counts, root:startPart };
+        }
+      }
       while(open.size){
         let cur=null, cg=Infinity;
         open.forEach(id=>{ if(g[id] < cg){ cg=g[id]; cur=id; } });
         if(cur===null) break;
         open.delete(cur);
-        for(const nb of (adj[cur]||[])){
+        const current = info[cur];
+        for(const nb of (adj[current.id]||[])){
+          const part = edgePart(nb.edge, current.id, nb.to);
+          const counts = addCrossings(current.counts, this._routeCrossings([part], areas));
+          if(!counts){ this._routeAreaBlocked = true; continue; }
+          const nextKey = keyFor(nb.to, counts);
           const t = g[cur] + nb.w;
-          if(t < (g[nb.to]!=null?g[nb.to]:Infinity)){
-            came[nb.to]=cur; g[nb.to]=t; open.add(nb.to);
-            const a=nodeById[cur], b=nodeById[nb.to];
-            segs.push({ x1:a.xRatio*1000, y1:a.yRatio*this._vbH(), x2:b.xRatio*1000, y2:b.yRatio*this._vbH() });
+          if(t < (g[nextKey]!=null?g[nextKey]:Infinity)){
+            came[nextKey]=cur; cameEdge[nextKey]=part; g[nextKey]=t; open.add(nextKey);
+            info[nextKey] = { id:nb.to, counts, root:current.root };
+            const samples = this._partSamples(part, 8);
+            for(let i=1;i<samples.length;i++) segs.push({ x1:samples[i-1].x, y1:samples[i-1].y, x2:samples[i].x, y2:samples[i].y });
           }
         }
       }
       // điểm ra: chỉ so sánh trong các node gần chủ phiên → chọn tổng nhỏ nhất
-      let bestNode=null, bestTotal=Infinity;
-      for(const id in goalCands){
-        if(g[id]==null) continue;
-        const total = g[id] + goalCands[id];
-        if(total < bestTotal){ bestTotal=total; bestNode=id; }
+      let bestKey=null, bestTotal=Infinity, bestExit=null;
+      for(const stateKey in info){
+        const current = info[stateKey], exit = goalCands[current.id];
+        if(exit==null) continue;
+        const exitPart = { a:point(nodeById[current.id]), b:point(op), curve:null };
+        if(!addCrossings(current.counts, this._routeCrossings([exitPart], areas))){ this._routeAreaBlocked = true; continue; }
+        const total = g[stateKey] + exit;
+        if(total < bestTotal){ bestTotal=total; bestKey=stateKey; bestExit=exitPart; }
       }
-      if(bestNode===null) return null;
-      const path=[bestNode]; let cur=bestNode;
-      while(came[cur]!==undefined){ cur=came[cur]; path.unshift(cur); }
-      return { path, dist:bestTotal, segs };
+      if(bestKey===null) return null;
+      const statePath=[bestKey]; let cur=bestKey;
+      while(came[cur]!==undefined){ cur=came[cur]; statePath.unshift(cur); }
+      const path=statePath.map(stateKey=>info[stateKey].id);
+      const parts=[info[bestKey].root];
+      for(let i=1;i<statePath.length;i++) parts.push(cameEdge[statePath[i]]);
+      parts.push(bestExit);
+      return { path, parts, dist:bestTotal, segs };
     };
 
     // Ưu tiên vào ở điểm gần; chỉ nới ra toàn bộ khi điểm gần không tới được đích.
@@ -1677,9 +1944,9 @@ class Component extends DCLogic {
     if(!st.viewerPos){ this.setState({ routeError:L.errNoViewer, picking:true, sheetOpen:false }); this._toast(L.errNoViewer); return; }
     if(st.nodes.length < 2){ this.setState({ routeError:L.errNoGraph }); this._toast(L.errNoGraph); return; }
     const res = this._bestRoute(st.viewerPos, st.ownerPos);
-    if(!res){ this.setState({ route:null, routeError:L.errNoPath, searchSegs:[] }); this._toast(L.errNoPath); return; }
+    if(!res){ const err = this._routeAreaBlocked ? L.errAreaBlocked : L.errNoPath; this.setState({ route:null, routeParts:null, routeError:err, searchSegs:[] }); this._toast(err); return; }
     // animate the search frontier, then reveal the route
-    this.setState({ routeError:null, route:null, searchSegs:[] });
+    this.setState({ routeError:null, route:null, routeParts:null, searchSegs:[] });
     let i=0; const segs=res.segs;
     if(this._anim) clearInterval(this._anim);
     this._anim = setInterval(()=>{
@@ -1688,21 +1955,21 @@ class Component extends DCLogic {
       if(i >= segs.length){
         clearInterval(this._anim); this._anim=null;
         const totalDist = res.dist; // đã gồm vào thẳng + đường trên graph + ra thẳng
-        setTimeout(()=>this.setState({ route:res.path, routeDist:Math.round(totalDist), routeHops:res.path.length, searchSegs:[] }), 180);
+        setTimeout(()=>this.setState({ route:res.path, routeParts:res.parts, routeDist:Math.round(totalDist), routeHops:res.path.length, searchSegs:[] }), 180);
       }
     }, 45);
   }
   _recomputeRoute(){ if(this.state.viewerPos && this.state.ownerPos) this.findRoute(); }
-  clearRoute(){ if(this._anim){ clearInterval(this._anim); this._anim=null; } this.setState({ route:null, routeError:null, searchSegs:[], viewerPos:null, picking:false }); }
+  clearRoute(){ if(this._anim){ clearInterval(this._anim); this._anim=null; } this.setState({ route:null, routeParts:null, routeError:null, searchSegs:[], viewerPos:null, picking:false }); }
 
   /* ---------------- session actions ---------------- */
-  startCreate(){ if(!this.requireAuth('create')) return; this._sessData=null; this._areaRedo=[]; this.hist=[{nodes:[],edges:[],labels:[]}]; this.hptr=0; this.setState({ nodes:[], edges:[], labels:[], areaDraft:[], labelEditor:null, labelDraftText:'', histIdx:0, histLen:1, penLast:null, penCursor:null, connectFrom:null, ownerPos:null, created:false, token:null, createTab:'map', aerialChosen:false }); this._nav('create'); }
+  startCreate(){ if(!this.requireAuth('create')) return; this._sessData=null; this._areaRedo=[]; this.hist=[{nodes:[],edges:[],labels:[]}]; this.hptr=0; this.setState({ nodes:[], edges:[], labels:[], areaDraft:[], labelEditor:null, labelDraftText:'', histIdx:0, histLen:1, penLast:null, penCursor:null, penPreview:null, areaPreview:null, connectFrom:null, ownerPos:null, created:false, token:null, createTab:'map', aerialChosen:false }); this._nav('create'); }
   goHome(){ this._teardownChannel(); this._nav(''); }
   demoOpen(){ // quick demo: create a session with the sample map and jump to graph editor
     this._teardownChannel();
     this._areaRedo=[];
     this.hist=[{nodes:[],edges:[],labels:[]}]; this.hptr=0;
-    this.setState({ mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048, aerialChosen:true, nodes:[], edges:[], labels:[], areaDraft:[], labelEditor:null, labelDraftText:'', penLast:null, penCursor:null, connectFrom:null, histIdx:0, histLen:1, ownerPos:{xRatio:0.55,yRatio:0.46} });
+    this.setState({ mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048, aerialChosen:true, nodes:[], edges:[], labels:[], areaDraft:[], labelEditor:null, labelDraftText:'', penLast:null, penCursor:null, penPreview:null, areaPreview:null, connectFrom:null, histIdx:0, histLen:1, ownerPos:{xRatio:0.55,yRatio:0.46} });
     this._createSession(60, null, ()=>{ this._nav('create'); this.setState({screen:'create', createTab:'graph', sheetOpen:true}); this._scheduleFit(); this._toast(this.L().demoReady); }, false);
   }
   chooseAerial(){ this.setState({ mapImage:'maps/aerial.jpg', mapW:2048, mapH:2048, aerialChosen:true, createTab:'pos' }); this._scheduleFit(); }
@@ -1722,7 +1989,7 @@ class Component extends DCLogic {
       const finish = (mapImage)=>{
         this._areaRedo=[];
         this.hist=[{nodes:[],edges:[],labels:[]}]; this.hptr=0;
-        this.setState({ mapImage, mapW:w, mapH:h, aerialChosen:true, createTab:'pos', nodes:[], edges:[], labels:[], areaDraft:[], labelEditor:null, labelDraftText:'', histIdx:0, histLen:1, penLast:null, penCursor:null, connectFrom:null });
+        this.setState({ mapImage, mapW:w, mapH:h, aerialChosen:true, createTab:'pos', nodes:[], edges:[], labels:[], areaDraft:[], labelEditor:null, labelDraftText:'', histIdx:0, histLen:1, penLast:null, penCursor:null, penPreview:null, areaPreview:null, connectFrom:null });
         this._scheduleFit();
       };
       // Có server: upload ảnh, lưu URL (tránh nhồi data URL lớn vào session JSON).
@@ -1871,11 +2138,13 @@ class Component extends DCLogic {
     const extra = this.state.lang==='vi' ? {
       labelHelp:'Nhấn vị trí trên bản đồ để đặt tên; nhấn lại nhãn để sửa hoặc xóa.',
       toolArea:'Vẽ vùng', areaHelp:'Nhấn từng đỉnh để vẽ vùng tự do. Nhấn lại đỉnh đầu hoặc Enter để đóng; Esc để hủy.', areaContinue:'Đã có đỉnh. Nhấn tiếp để thêm góc, đỉnh đầu hoặc Enter để đóng vùng.', areaNeedThree:'Vùng cần ít nhất 3 đỉnh.',
-      labelPointTitle:'Đặt tên vị trí', labelAreaTitle:'Đặt tên khu vực', labelEditTitle:'Sửa tên', labelPointHint:'Tên sẽ hiện cùng dấu pin trên bản đồ.', labelAreaHint:'Tên sẽ hiện ở giữa vùng đã vẽ.', labelNamePlaceholder:'Nhập tên…', labelSave:'Lưu', labelCancel:'Hủy', labelDelete:'Xóa', labelRequired:'Hãy nhập tên trước khi lưu.'
+      labelPointTitle:'Đặt tên vị trí', labelAreaTitle:'Đặt tên khu vực', labelEditTitle:'Sửa tên', labelPointHint:'Tên sẽ hiện cùng dấu pin trên bản đồ.', labelAreaHint:'Tên sẽ hiện ở giữa vùng đã vẽ.', labelNamePlaceholder:'Nhập tên…', labelSave:'Lưu', labelCancel:'Hủy', labelDelete:'Xóa', labelRequired:'Hãy nhập tên trước khi lưu.',
+      errAreaBlocked:'Tuyến không được đi xuyên qua vùng; mỗi vùng chỉ được cắt biên tối đa một lần.', penHelp:'Nhấn để đặt điểm. Kéo từ điểm mới để tạo đoạn cong.', penContinue:'Nhấn tiếp để kéo dài; kéo từ điểm mới để uốn đoạn. Nhấn lại điểm cuối hoặc Esc để kết thúc.', areaHelp:'Nhấn từng góc để vẽ vùng. Kéo từ góc mới để tạo cạnh cong; Enter hoặc nhấn góc đầu để đóng.', areaContinue:'Thêm góc, kéo để tạo cạnh cong, hoặc nhấn góc đầu/Enter để đóng vùng.', labelAreaHint:'Tên hiện ở giữa vùng; vùng này không cho tuyến đi xuyên qua.'
     } : {
       labelHelp:'Click a map location to name it. Click a label again to edit or remove it.',
       toolArea:'Draw area', areaHelp:'Click each corner to draw a free-form area. Click the first point or press Enter to close; Esc cancels.', areaContinue:'Keep adding corners, click the first point, or press Enter to close the area.', areaNeedThree:'An area needs at least 3 points.',
-      labelPointTitle:'Name location', labelAreaTitle:'Name area', labelEditTitle:'Edit name', labelPointHint:'The name appears with a pin marker on the map.', labelAreaHint:'The name appears at the center of the drawn area.', labelNamePlaceholder:'Enter a name…', labelSave:'Save', labelCancel:'Cancel', labelDelete:'Delete', labelRequired:'Enter a name before saving.'
+      labelPointTitle:'Name location', labelAreaTitle:'Name area', labelEditTitle:'Edit name', labelPointHint:'The name appears with a pin marker on the map.', labelAreaHint:'The name appears at the center of the drawn area.', labelNamePlaceholder:'Enter a name…', labelSave:'Save', labelCancel:'Cancel', labelDelete:'Delete', labelRequired:'Enter a name before saving.',
+      errAreaBlocked:'A route cannot pass through an area; each area boundary may be crossed at most once.', penHelp:'Click to place a point. Drag from a new point to make a curved segment.', penContinue:'Keep clicking to extend; drag from a new point to bend the segment. Click the last point or press Esc to finish.', areaHelp:'Click each corner to draw an area. Drag from a new corner to make a curved boundary; press Enter or click the first corner to close.', areaContinue:'Add a corner, drag to curve the boundary, or click the first corner/press Enter to close.', labelAreaHint:'The name appears inside the area; routes cannot pass through it.'
     };
     return Object.assign(D[this.state.lang] || D.en, extra);
   }
@@ -1935,12 +2204,12 @@ class Component extends DCLogic {
       const a=nodeById[e.from], b=nodeById[e.to]; if(!a||!b) return null;
       const sel = st.selEdge === e.id;
       let color = e.blocked ? '#ef4444' : (sel ? '#dc2626' : (editingGraph ? '#1d4ed8' : 'rgba(226,232,240,.85)'));
-      return { id:e.id, x1:a.xRatio*1000, y1:a.yRatio*vbH, x2:b.xRatio*1000, y2:b.yRatio*vbH,
+      return { id:e.id, d:this._edgePathD(e,a,b),
         color, w: sel?5.5:(e.blocked?3.5:3.5), dash: e.blocked?'6 5':'0',
         marker: (!e.bidirectional && !e.blocked) ? 'url(#arrowg)' : 'none',
         filter: editingGraph ? 'drop-shadow(0 0 2.5px rgba(255,255,255,.95))' : 'drop-shadow(0 1px 1.5px rgba(0,0,0,.4))',
         cursor: editingGraph ? 'pointer':'default',
-        onClick: editingGraph ? (ev)=>this._edgeClick(e.id, ev) : null };
+        onClick: editingGraph && st.tool!=='pen' && st.tool!=='area' ? (ev)=>this._edgeClick(e.id, ev) : null };
     }).filter(Boolean);
     const nodesView = showNodes ? st.nodes.map(n=>{
       const sel = st.selNode === n.id, cf = st.connectFrom === n.id || st.penLast === n.id;
@@ -1951,28 +2220,27 @@ class Component extends DCLogic {
     }) : [];
     const areasView = (st.labels||[]).filter(l=>Array.isArray(l.points) && l.points.length>=3).map(l=>({
       id:l.id,
-      points:l.points.map(p=>(p.xRatio*1000)+' '+(p.yRatio*vbH)).join(' '),
+      d:this._areaPathD(l),
       fill:'rgba(220,38,38,.12)',
       stroke:'rgba(220,38,38,.72)',
       sw:1.8,
       dash:'0'
     }));
     const areaDraftOn = (st.areaDraft||[]).length > 0;
-    const areaDraftPts = (st.areaDraft||[]).map(p=>(p.xRatio*1000)+' '+(p.yRatio*vbH)).join(' ');
+    const areaDraftD = this._areaPathD({ points:st.areaDraft||[] });
     const areaDraftNodes = (st.areaDraft||[]).map(p=>({ cx:p.xRatio*1000, cy:p.yRatio*vbH }));
+    const areaPreviewPoint = st.areaPreview ? { ...st.areaPreview.anchor, ...(st.areaPreview.curveFrom ? { curveFrom:st.areaPreview.curveFrom } : {}) } : null;
+    const areaPreviewPoints = areaPreviewPoint && (st.areaDraft||[]).length ? (st.areaDraft||[]).concat([areaPreviewPoint]) : [];
+    const areaPreviewD = this._areaPathD({ points:areaPreviewPoints }, false);
+    const areaPreviewOn = editingGraph && st.tool==='area' && !!st.areaPreview && (st.areaDraft||[]).length > 0;
+    const penPreviewOn = editingGraph && st.tool==='pen' && !!st.penLast && !!st.penPreview && !!nodeById[st.penLast];
+    const penPreviewD = penPreviewOn ? this._edgePathD({ curve:st.penPreview.curve }, nodeById[st.penLast], st.penPreview.anchor) : '';
     const searchView = showEdges ? st.searchSegs : []; // ẩn hoạt ảnh dò đường cho người xem
 
     // connectors (marker → nearest node)
     const connectorsView = [];
-    let routePts = '';
     const hasRoute = !!st.route && st.route.length > 0;
-    if(hasRoute){
-      const pts = st.route.map(id=>{ const n=nodeById[id]; return (n.xRatio*1000)+','+(n.yRatio*vbH); });
-      // prepend viewer, append owner
-      if(st.viewerPos) pts.unshift((st.viewerPos.xRatio*1000)+','+(st.viewerPos.yRatio*vbH));
-      if(st.ownerPos) pts.push((st.ownerPos.xRatio*1000)+','+(st.ownerPos.yRatio*vbH));
-      routePts = pts.join(' ');
-    }
+    const routePathD = hasRoute ? this._routePathD(st.routeParts||[]) : '';
     // show connector dashes when picking / snapping — chỉ khi hiển thị khung đường (không dành cho người xem)
     if(!hasRoute && editingGraph === false && showEdges){
       if(st.viewerPos){ const near=this._nearestNode(st.viewerPos); if(near) connectorsView.push({ x1:st.viewerPos.xRatio*1000, y1:st.viewerPos.yRatio*vbH, x2:near.node.xRatio*1000, y2:near.node.yRatio*vbH, color:'#2563eb' }); }
@@ -2129,23 +2397,26 @@ class Component extends DCLogic {
       // map
       mapImage:st.mapImage, imgRef:this.imgRef, viewBox:`0 0 1000 ${Math.round(vbH)}`, worldW: st.isMobile?520:760, worldAspect:`${st.mapW} / ${st.mapH}`,
       vpRef:this.vpRef, worldRef:this.worldRef, svgRef:this.svgRef, onImgLoad:()=>this._scheduleFit(),
-      edgesView, nodesView, searchView, connectorsView, routePts, hasRoute,
+      edgesView, nodesView, searchView, connectorsView, routePathD, hasRoute,
       labelsView: (st.labels||[]).map(l=>{
         const c = this._labelCenter(l), area = Array.isArray(l.points) || l.wRatio != null;
         return { id:l.id, text:l.text, l:c.x*100, t:c.y*100, point:!area, stem:!area, tf: area?'translate(-50%,-50%) scale(calc(1/var(--z,1)))':'translate(-50%,-140%) scale(calc(1/var(--z,1)))' };
       }),
       areaLabels: (st.labels||[]).filter(l=>l.wRatio != null).map(l=>({ id:l.id, l:l.xRatio*100, t:l.yRatio*100, w:l.wRatio*100, h:l.hRatio*100 })),
-      areasView, areaDraftOn, areaDraftPts, areaDraftNodes,
-      penGuideOn: editingGraph && st.tool==='pen' && !!st.penLast && !!st.penCursor,
+      areasView, areaDraftOn, areaDraftD, areaDraftNodes, areaPreviewOn, areaPreviewD,
+      areaPreviewCx: areaPreviewPoint ? areaPreviewPoint.xRatio*1000 : 0,
+      areaPreviewCy: areaPreviewPoint ? areaPreviewPoint.yRatio*vbH : 0,
+      penPreviewOn, penPreviewD,
+      penGuideOn: editingGraph && st.tool==='pen' && !!st.penLast && !!st.penCursor && !st.penPreview,
       penGuideX1: st.penLast && nodeById[st.penLast] ? nodeById[st.penLast].xRatio*1000 : 0,
       penGuideY1: st.penLast && nodeById[st.penLast] ? nodeById[st.penLast].yRatio*vbH : 0,
       penGuideX2: st.penCursor ? st.penCursor.xRatio*1000 : 0,
       penGuideY2: st.penCursor ? st.penCursor.yRatio*vbH : 0,
       hasOwnerPin, ownerPinL: st.ownerPos?st.ownerPos.xRatio*100:0, ownerPinT: st.ownerPos?st.ownerPos.yRatio*100:0,
-      ownerPinCursor: ownerPinDrag?'grab':'default', ownerPinLive: st.ownerLive, onOwnerPinDown:(e)=>{ if(!ownerPinDrag) return; e.stopPropagation(); this.drag={mode:'owner',moved:false,x:e.clientX,y:e.clientY}; },
+      ownerPinCursor: st.spacePan?'grab':(ownerPinDrag?'grab':'default'), ownerPinLive: st.ownerLive, onOwnerPinDown:(e)=>{ if(st.spacePan || this._spaceHeld){ e.stopPropagation(); this.drag={mode:'space-pan',moved:false,x:e.clientX,y:e.clientY,ox:this.tx,oy:this.ty}; return; } if(!ownerPinDrag) return; e.stopPropagation(); this.drag={mode:'owner',moved:false,x:e.clientX,y:e.clientY}; },
       hasViewerPin, viewerPinL: st.viewerPos?st.viewerPos.xRatio*100:0, viewerPinT: st.viewerPos?st.viewerPos.yRatio*100:0,
-      viewerPinCursor: isViewer?'grab':'default', onViewerPinDown:(e)=>{ if(!isViewer) return; e.stopPropagation(); this.drag={mode:'viewer',moved:false,x:e.clientX,y:e.clientY}; },
-      stageCursor: (editingGraph&&(st.tool==='node'||st.tool==='pen'||st.tool==='label'||st.tool==='area'))||ownerPinDrag||(isViewer&&st.picking) ? 'crosshair' : 'grab',
+      viewerPinCursor: st.spacePan?'grab':(isViewer?'grab':'default'), onViewerPinDown:(e)=>{ if(st.spacePan || this._spaceHeld){ e.stopPropagation(); this.drag={mode:'space-pan',moved:false,x:e.clientX,y:e.clientY,ox:this.tx,oy:this.ty}; return; } if(!isViewer) return; e.stopPropagation(); this.drag={mode:'viewer',moved:false,x:e.clientX,y:e.clientY}; },
+      stageCursor: st.spacePan ? 'grab' : ((editingGraph&&(st.tool==='node'||st.tool==='pen'||st.tool==='label'||st.tool==='area'))||ownerPinDrag||(isViewer&&st.picking) ? 'crosshair' : 'grab'),
       zoomIn:()=>this.zoomIn(), zoomOut:()=>this.zoomOut(), zoomReset:()=>this.zoomReset(), zoomBtnStyle:zoomBtn,
       instructionLabel:instruction,
       // toast
@@ -2161,7 +2432,8 @@ class Component extends DCLogic {
   setTool(tool){
     this._penPendingCursor = null;
     this._areaRedo = [];
-    this.setState({ tool, connectFrom:null, penLast:null, penCursor:null, areaDraft:[], labelEditor:null, labelDraftText:'' });
+    this._clearGesturePreview();
+    this.setState({ tool, connectFrom:null, penLast:null, penCursor:null, penPreview:null, areaPreview:null, areaDraft:[], labelEditor:null, labelDraftText:'' });
   }
   _graphTools(s, editingGraph){
     const st = this.state;

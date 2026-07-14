@@ -24,7 +24,7 @@ window.MSNet = (function () {
     get: function (token, ot) {
       var p = '/sessions/' + encodeURIComponent(token);
       if (ot) p += '?ot=' + encodeURIComponent(ot);
-      return fetch(api(p)).then(function (r) {
+      return fetch(api(p), { cache: 'no-store' }).then(function (r) {
         if (r.status === 404) return null;
         if (!r.ok) throw new Error('http ' + r.status);
         return r.json();
@@ -670,6 +670,8 @@ class Component extends DCLogic {
     this._pendingGesturePreview = null;
     this._curvePreviewFrame = null;
     this._spaceHeld = false;
+    this._remoteFetches = Object.create(null);
+    this._createPending = null;
     // viewport transform (imperative — not in state to avoid re-render churn)
     this.tx = 0; this.ty = 0; this.sc = 1;
     this.peerId = Math.random().toString(36).slice(2,10);
@@ -784,6 +786,11 @@ class Component extends DCLogic {
     this._penPendingCursor = null;
     this._pendingGesturePreview = null;
     this._spaceHeld = false;
+    for(const token in this._remoteFetches){
+      if(this._remoteFetches[token] && this._remoteFetches[token].timer) clearTimeout(this._remoteFetches[token].timer);
+    }
+    this._remoteFetches = Object.create(null);
+    this._createPending = null;
     this._teardownChannel();
   }
   _syncMapImg(){
@@ -836,10 +843,12 @@ class Component extends DCLogic {
       const sess = this._load(token);
       if(!sess){
         // Không có ở máy này → thử nạp từ server (người xem ở thiết bị khác).
-        if(window.MSNet && window.MSNet.enabled && !(this._remoteTried && this._remoteTried[token])){
-          (this._remoteTried = this._remoteTried || {})[token] = true;
+        if(window.MSNet && window.MSNet.enabled){
           this.setState({ screen:'loading' });
-          this._fetchRemote(token, 0, seg[3]);
+          if(!this._remoteFetches[token]){
+            this._remoteFetches[token] = { timer:null };
+            this._fetchRemote(token, 0, seg[3]);
+          }
           return;
         }
         this.setState({ screen:'notfound' }); return;
@@ -1036,14 +1045,26 @@ class Component extends DCLogic {
   /* ---------------- nạp session từ server ---------------- */
   _fetchRemote(token, attempt, ot){
     attempt = attempt || 0;
+    const job = this._remoteFetches[token];
+    if(!job) return;
+    const isCurrentRoute = ()=>{
+      const raw = (location.hash || '').replace(/^#\/?/, '');
+      const seg = raw.split('/').filter(Boolean);
+      return seg[0] === 's' && seg[1] === token;
+    };
     const retryOrFail = ()=>{
       // Thử lại vài lần: người xem có thể mở link ngay khi POST tạo phiên chưa kịp lưu.
-      if(attempt < 6 && this._remoteTried && this._remoteTried[token]){
-        this._fetchTimer = setTimeout(()=>this._fetchRemote(token, attempt+1, ot), 700);
-      } else { this.setState({ screen:'notfound' }); }
+      if(this._remoteFetches[token] !== job) return;
+      if(attempt < 12){
+        job.timer = setTimeout(()=>this._fetchRemote(token, attempt+1, ot), 700);
+      } else {
+        delete this._remoteFetches[token];
+        if(isCurrentRoute()) this.setState({ screen:'notfound' });
+      }
     };
     window.MSNet.get(token, ot).then((sess)=>{
       if(sess && sess.token){
+        if(this._remoteFetches[token] === job) delete this._remoteFetches[token];
         this._memSet(token, sess); // giữ RAM: phiên lớn vượt quota localStorage vẫn hiển thị được
         try{ localStorage.setItem(this._key(token), JSON.stringify(sess)); }catch(e){}
         this.route();
@@ -2043,7 +2064,17 @@ class Component extends DCLogic {
     // Giữ bản đầy đủ để re-POST khi chủ phiên chỉnh sửa tiếp ở màn tạo phiên.
     this._sessData = sess;
     // Chỉ đẩy lên server khi thực sự chia sẻ link (persist). Demo chỉ chỉnh sửa cục bộ.
-    if(persist && window.MSNet && window.MSNet.enabled){ window.MSNet.create(sess).catch(()=>{ this._toast(this.L().syncFail); }); }
+    this._createPending = null;
+    if(persist && window.MSNet && window.MSNet.enabled){
+      const pending = { token, promise:window.MSNet.create(sess) };
+      this._createPending = pending;
+      pending.promise.then(()=>{
+        if(this._createPending === pending) this._createPending = null;
+      }).catch(()=>{
+        if(this._createPending === pending) this._createPending = null;
+        this._toast(this.L().syncFail);
+      });
+    }
     this.setState({ token, ownerToken, expiresAt, created:!!persist }, cb);
   }
   generateLink(){
@@ -2088,7 +2119,17 @@ class Component extends DCLogic {
   }
   openOwner(){ this._nav('s/'+this.state.token+'/owner/'+this.state.ownerToken); }
   openGraph(){ this._nav('s/'+this.state.token+'/graph/'+this.state.ownerToken); }
-  openViewer(){ window.open(this._viewerLink(), '_blank'); this._toast(this.L().viewerOpened); }
+  openViewer(){
+    const url = this._viewerLink();
+    const pending = this._createPending && this._createPending.token === this.state.token ? this._createPending.promise : null;
+    if(!pending){ window.open(url, '_blank'); this._toast(this.L().viewerOpened); return; }
+    const popup = window.open('about:blank', '_blank');
+    pending.then(()=>{
+      if(popup && !popup.closed) popup.location.href = url;
+      else window.open(url, '_blank');
+      this._toast(this.L().viewerOpened);
+    }).catch(()=>{ if(popup && !popup.closed) popup.close(); });
+  }
 
   lockOwner(){ if(!this.state.ownerPos){ this._toast(this.L().needOwnerPos); return; } this.setState({ ownerLocked:true }, ()=>this._saveOwner()); this._toast(this.L().locked); }
   unlockOwner(){ this.setState({ ownerLocked:false }, ()=>this._saveOwner()); }

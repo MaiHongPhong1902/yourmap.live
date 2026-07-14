@@ -205,6 +205,11 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', true); // sau nginx: đọc đúng X-Forwarded-Proto
 app.use(express.json({ limit: '20mb' })); // đủ chỗ cho mapImage dạng data URL (fallback upload / ảnh nhúng khi "Tải bản đồ")
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  next();
+});
 
 // Upload ảnh bản đồ ------------------------------------------------------------
 const upload = multer({

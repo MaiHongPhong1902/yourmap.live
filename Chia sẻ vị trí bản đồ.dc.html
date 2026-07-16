@@ -525,7 +525,7 @@ window.MSNet = (function () {
               </sc-if>
               <!-- nodes -->
               <sc-for list="{{ nodesView }}" as="n" hint-placeholder-count="0">
-                <circle cx="0" cy="0" data-dc-bind-cx="{{ n.cx }}" data-dc-bind-cy="{{ n.cy }}" r="16" fill="transparent" style="cursor:{{ n.cursor }};" onPointerDown="{{ n.onDown }}"></circle>
+                <circle cx="0" cy="0" data-dc-bind-cx="{{ n.cx }}" data-dc-bind-cy="{{ n.cy }}" r="9" fill="transparent" style="cursor:{{ n.cursor }};" onPointerDown="{{ n.onDown }}"></circle>
                 <circle cx="0" cy="0" r="4" data-dc-bind-cx="{{ n.cx }}" data-dc-bind-cy="{{ n.cy }}" data-dc-bind-r="{{ n.r }}" fill="{{ n.fill }}" stroke="#fff" stroke-width="1.7" vector-effect="non-scaling-stroke" style="cursor:{{ n.cursor }};pointer-events:none;"></circle>
               </sc-for>
               <sc-if value="{{ penPreviewOn }}" hint-placeholder-val="{{ false }}">
@@ -830,7 +830,11 @@ class Component extends DCLogic {
     // rebind stage listeners once refs exist
     if(!this._stageBound) this._bindStage();
     this._syncMapImg();
-    if(this.state.labelEditor && !prev.labelEditor && this.labelInputRef.current){
+    // Chỉ focus/select MỘT LẦN khi editor vừa mở. `prev` ở đây là prevProps
+    // (không phải prevState) nên không thể dựa vào prev.labelEditor — nếu làm vậy,
+    // mỗi lần gõ sẽ select() lại toàn bộ và ký tự sau ghi đè ký tự trước.
+    if(this.state.labelEditor && this._pendingLabelFocus && this.labelInputRef.current){
+      this._pendingLabelFocus = false;
       requestAnimationFrame(()=>{ try{ this.labelInputRef.current.focus(); this.labelInputRef.current.select(); }catch(e){} });
     }
     // (re)draw QR when link becomes available
@@ -1455,6 +1459,7 @@ class Component extends DCLogic {
   _openLabelEditor(opts){
     const label = opts && opts.label;
     const legacyArea = label && label.wRatio != null;
+    this._pendingLabelFocus = true; // focus + chọn sẵn nội dung khi editor mở (chỉ 1 lần)
     this.setState({
       labelEditor:{ mode:label?'edit':'create', id:label?label.id:null, kind:label && (label.points || legacyArea) ? 'area' : ((opts&&opts.kind)||'point'),
         points:(opts&&opts.points) || (label&&label.points) || null,

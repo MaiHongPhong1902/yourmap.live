@@ -21,11 +21,15 @@ window.MSNet = (function () {
   function api(p) { return '/api' + p; }
   return {
     enabled: enabled,
-    get: function (token, ot) {
+    get: function (token, ot, pw) {
       var p = '/sessions/' + encodeURIComponent(token);
       if (ot) p += '?ot=' + encodeURIComponent(ot);
-      return fetch(api(p), { cache: 'no-store' }).then(function (r) {
+      var headers = {};
+      // Mật khẩu (nếu có) gửi qua header, encode để an toàn với ký tự Unicode.
+      if (pw != null && pw !== '') headers['x-session-password'] = encodeURIComponent(pw);
+      return fetch(api(p), { cache: 'no-store', headers: headers }).then(function (r) {
         if (r.status === 404) return null;
+        if (r.status === 401) return { passwordRequired: true };
         if (!r.ok) throw new Error('http ' + r.status);
         return r.json();
       });
@@ -48,10 +52,11 @@ window.MSNet = (function () {
       return fetch(api('/upload'), { method: 'POST', body: fd })
         .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); });
     },
-    wsUrl: function (token, ot) {
+    wsUrl: function (token, ot, pw) {
       var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
       var u = proto + '//' + location.host + '/ws?token=' + encodeURIComponent(token);
       if (ot) u += '&ot=' + encodeURIComponent(ot);
+      if (pw != null && pw !== '') u += '&pw=' + encodeURIComponent(pw);
       return u;
     },
     // ---- tài khoản & quản lý phiên ----
@@ -217,6 +222,24 @@ window.MSNet = (function () {
             <button type="submit" style="width:100%;margin-top:14px;padding:13px;border-radius:12px;border:none;background:#dc2626;color:#fff;font-weight:700;font-size:.95rem;cursor:pointer;box-shadow:0 8px 20px rgba(220,38,38,.28);">{{ authSubmitLabel }}</button>
           </form>
           <button onClick="{{ toggleAuthMode }}" style="width:100%;margin-top:14px;background:none;border:none;color:#dc2626;font-weight:700;font-size:.86rem;cursor:pointer;">{{ authSwitchText }}</button>
+        </div>
+      </sc-if>
+
+      <!-- PASSWORD GATE (người xem) -->
+      <sc-if value="{{ isPassword }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:40px 30px;max-width:400px;margin:20px auto 0;animation:fadeup .4s ease;">
+          <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#dc2626,#475569);display:grid;place-items:center;margin-bottom:18px;box-shadow:0 6px 16px rgba(220,38,38,.28);">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h2 style="font-size:1.5rem;font-weight:800;margin-bottom:6px;">{{ pwTitle }}</h2>
+          <p style="color:#94a3b8;font-size:.88rem;margin-bottom:22px;">{{ pwSubtitle }}</p>
+          <form onSubmit="{{ submitViewerPw }}">
+            <input value="{{ pwInput }}" onChange="{{ onViewerPw }}" placeholder="{{ pwPlaceholder }}" type="password" autocomplete="off" style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:11px;font-size:.95rem;margin-bottom:6px;background:#fff;color:#0f172a;">
+            <sc-if value="{{ pwError }}" hint-placeholder-val="{{ false }}">
+              <p style="color:#dc2626;font-size:.82rem;font-weight:600;margin:6px 2px 0;">{{ pwError }}</p>
+            </sc-if>
+            <button type="submit" style="width:100%;margin-top:14px;padding:13px;border-radius:12px;border:none;background:#dc2626;color:#fff;font-weight:700;font-size:.95rem;cursor:pointer;box-shadow:0 8px 20px rgba(220,38,38,.28);">{{ pwSubmitLabel }}</button>
+          </form>
         </div>
       </sc-if>
 
@@ -671,6 +694,7 @@ class Component extends DCLogic {
     this._curvePreviewFrame = null;
     this._spaceHeld = false;
     this._remoteFetches = Object.create(null);
+    this._viewerPw = Object.create(null); // mật khẩu người xem đã nhập, theo token (giữ trong RAM)
     this._createPending = null;
     // viewport transform (imperative — not in state to avoid re-render churn)
     this.tx = 0; this.ty = 0; this.sc = 1;
@@ -699,6 +723,8 @@ class Component extends DCLogic {
       // tài khoản & quản lý phiên
       user:null, authChecked:false, authMode:'login', authName:'', authPass:'', authError:'', authBusy:false,
       mySessions:[], mySessionsLoading:false,
+      // cổng mật khẩu người xem
+      pwInput:'', pwError:'', pwBusy:false,
     };
   }
 
@@ -865,6 +891,9 @@ class Component extends DCLogic {
       // Mobile: màn vẽ đường mở sẵn sheet; owner/viewer để map full, mở bằng nút icon.
       this.setState({ screen, sheetOpen: screen === 'graph' });
       this._ensureChannel(token, screen === 'viewer' ? 'viewer' : 'owner', otoken);
+      // Mở từ cache local → làm tươi từ server để bắt kịp thay đổi khi offline
+      // (phiên bị kết thúc/xóa/hết hạn hoặc đồ thị đã đổi).
+      this._refreshRemote(token, otoken);
       // fit view after image known
       this._scheduleFit();
       return;
@@ -1062,7 +1091,16 @@ class Component extends DCLogic {
         if(isCurrentRoute()) this.setState({ screen:'notfound' });
       }
     };
-    window.MSNet.get(token, ot).then((sess)=>{
+    window.MSNet.get(token, ot, this._viewerPw[token]).then((sess)=>{
+      if(sess && sess.passwordRequired){
+        // Phiên yêu cầu mật khẩu → hiện màn nhập mật khẩu (không thử lại tự động).
+        if(this._remoteFetches[token] === job) delete this._remoteFetches[token];
+        // Mật khẩu đã lưu sai (vd đổi mật khẩu) → xóa để nhập lại.
+        const wrongTried = this._viewerPw[token] != null;
+        delete this._viewerPw[token];
+        if(isCurrentRoute()) this.setState({ screen:'password', pwInput:'', pwBusy:false, pwError: wrongTried ? this.L().pwWrong : '' });
+        return;
+      }
       if(sess && sess.token){
         if(this._remoteFetches[token] === job) delete this._remoteFetches[token];
         this._memSet(token, sess); // giữ RAM: phiên lớn vượt quota localStorage vẫn hiển thị được
@@ -1070,6 +1108,51 @@ class Component extends DCLogic {
         this.route();
       } else { retryOrFail(); }
     }).catch(retryOrFail);
+  }
+
+  /* ---------------- làm tươi phiên từ server (bắt kịp thay đổi offline) ---------------- */
+  _refreshRemote(token, ot){
+    if(!(window.MSNet && window.MSNet.enabled)) return;
+    window.MSNet.get(token, ot, this._viewerPw[token]).then((sess)=>{
+      const rt = this._routeToken();
+      if(rt.token !== token) return; // đã rời phiên → bỏ qua
+      if(sess === null){ this.setState({ screen:'notfound' }); return; } // đã bị xóa
+      if(!sess || sess.passwordRequired || !sess.token) return; // giữ nguyên hiển thị từ cache
+      this._memSet(token, sess);
+      try{ localStorage.setItem(this._key(token), JSON.stringify(sess)); }catch(e){}
+      if(sess.status === 'ended'){ this.setState({ screen:'ended' }); return; }
+      if(sess.expiresAt && Date.now() > sess.expiresAt){ this.setState({ screen:'expired' }); return; }
+      // Người xem không chỉnh sửa nên đồng bộ toàn bộ dữ liệu hiển thị an toàn.
+      if(this.state.screen === 'viewer'){
+        this.setState({
+          nodes: sess.nodes||[], edges: sess.edges||[], labels: sess.labels||[],
+          ownerPos: sess.ownerPos||null, ownerLocked: !!sess.ownerLocked,
+          expiresAt: sess.expiresAt||null,
+        });
+        if(this.state.route) this._recomputeRoute();
+      }
+    }).catch(()=>{});
+  }
+
+  /* ---------------- cổng mật khẩu người xem ---------------- */
+  _routeToken(){
+    const raw = (location.hash || '').replace(/^#\/?/, '');
+    const seg = raw.split('/').filter(Boolean);
+    return seg[0] === 's' ? { token: seg[1], role: seg[2], ot: seg[3] } : {};
+  }
+  onViewerPw(e){ this.setState({ pwInput:e.target.value, pwError:'' }); }
+  submitViewerPw(){
+    if(this.state.pwBusy) return;
+    const { token, ot } = this._routeToken();
+    if(!token) return;
+    const pw = (this.state.pwInput||'').trim();
+    if(!pw){ this.setState({ pwError: this.L().pwEmpty }); return; }
+    this._viewerPw[token] = pw;
+    this.setState({ pwBusy:true, pwError:'', screen:'loading' });
+    // Nạp lại phiên với mật khẩu vừa nhập.
+    delete this._remoteFetches[token];
+    this._remoteFetches[token] = { timer:null };
+    this._fetchRemote(token, 0, ot);
   }
 
   /* ---------------- realtime (BroadcastChannel + WebSocket) ---------------- */
@@ -1095,7 +1178,7 @@ class Component extends DCLogic {
     this._wsToken = token;
     const ot = this._ot || null;
     try{
-      const ws = new WebSocket(window.MSNet.wsUrl(token, ot));
+      const ws = new WebSocket(window.MSNet.wsUrl(token, ot, this._viewerPw[token]));
       this.ws = ws;
       ws.onopen = ()=>{ this._send({type:'ping', peerId:this.peerId, role:this._myRole}); };
       ws.onmessage = (ev)=>{ try{ this._recv(JSON.parse(ev.data)); }catch(e){} };
@@ -1585,7 +1668,9 @@ class Component extends DCLogic {
     return C ? `M ${f(A.x)} ${f(A.y)} Q ${f(C.x)} ${f(C.y)} ${f(B.x)} ${f(B.y)}` : `M ${f(A.x)} ${f(A.y)} L ${f(B.x)} ${f(B.y)}`;
   }
   _areaShapePoints(area){
-    if(Array.isArray(area && area.points) && area.points.length >= 3) return area.points;
+    // >=1 để bản nháp (1-2 điểm) vẫn vẽ được đường viền/preview khi đang vẽ.
+    // Các nơi cần vùng hợp lệ (render đã lưu, chặn tuyến) tự lọc >=3 riêng.
+    if(Array.isArray(area && area.points) && area.points.length >= 1) return area.points;
     if(area && area.wRatio != null && area.hRatio != null){
       return [
         { xRatio:area.xRatio, yRatio:area.yRatio },
@@ -2160,6 +2245,7 @@ class Component extends DCLogic {
         viewerTitle:'Người xem', viewerTitleEn:'Viewer', sessActive:'Phiên đang hoạt động', sessExpiring:'Phiên sắp hết hạn', ownerReady:'Chủ phiên đã ghim vị trí', ownerWaiting:'Chủ phiên chưa đặt vị trí…', pick:'Chọn vị trí của tôi', picking:'Nhấn lên bản đồ…', useGps:'Dùng vị trí GPS', findRoute:'Chỉ đường', clearRoute:'Xóa đường đi', distance:'Khoảng cách ước tính', hops:'điểm trên tuyến', pickHint:'Nhấn lên bản đồ để đặt điểm bắt đầu.',
         errNoOwner:'Chủ phiên chưa đặt vị trí.', errNoViewer:'Hãy chọn vị trí bắt đầu của bạn trước.', errNoGraph:'Bản đồ chưa có đủ đường đi (cần ít nhất 2 điểm).', errNoPath:'Không tìm được đường nối giữa hai điểm.', needOwnerPos:'Hãy đặt vị trí chủ phiên trước.', viewerOpened:'Đã mở tab người xem', demoReady:'Demo sẵn sàng — vẽ đường rồi bấm "Tạo đường link chia sẻ" để lưu & chia sẻ', pickHint2:'', nodeOnEdge:'Đã chèn điểm vào đoạn đường có sẵn', undo:'Hoàn tác', redo:'Làm lại', toolPen:'Bút vẽ đường', penHint:'Vẽ đường liền mạch bằng cách nhấn nối tiếp', penOn:'Đang bật — nhấn để tắt', penHelp:'Nhấn lên bản đồ để bắt đầu vẽ. Mỗi lần nhấn thêm một điểm và tự nối với điểm trước.', penContinue:'Nhấn tiếp để kéo dài đường · nhấn lại điểm cuối (hoặc Esc) để kết thúc nét.', saveMap:'Lưu bản đồ', loadMap:'Tải bản đồ', mapSaved:'Đã lưu bản đồ ra file JSON', mapLoaded:'Đã tải bản đồ từ file', badFile:'File không hợp lệ', copyFail:'Link đã được bôi chọn — nhấn Ctrl/Cmd+C để sao chép', storageFull:'Ảnh quá lớn để đồng bộ giữa các tab.', syncFail:'Không lưu được phiên lên máy chủ — kiểm tra kết nối rồi thử lại.', gpsUnavailable:'Ảnh bản đồ chưa được georeference nên GPS không khả dụng — hãy chọn thủ công.',
         loadingTitle:'Đang tải phiên…', loadingMsg:'Đang lấy dữ liệu phiên từ máy chủ, vui lòng đợi.',
+        pwTitle:'Phiên được bảo vệ', pwSubtitle:'Nhập mật khẩu do chủ phiên đặt để xem bản đồ.', pwPlaceholder:'Nhập mật khẩu…', pwSubmit:'Mở phiên', pwEmpty:'Vui lòng nhập mật khẩu.', pwWrong:'Mật khẩu không đúng. Thử lại.',
         notfoundTitle:'Không tìm thấy phiên', notfoundMsg:'Đường link không hợp lệ hoặc phiên đã bị xóa.', expiredTitle:'Phiên đã hết hạn', expiredMsg:'Phiên này đã quá thời gian hoạt động và không còn truy cập được.', deniedTitle:'Không có quyền', deniedMsg:'Token quản trị không hợp lệ. Bạn không có quyền chỉnh sửa phiên này.', endedTitle:'Phiên đã kết thúc', endedMsg:'Chủ phiên đã kết thúc phiên này.',
         expNever:'Không hết hạn', min15:'15 phút', min60:'1 giờ', min240:'4 giờ', min1440:'24 giờ', min10080:'7 ngày', min43200:'30 ngày', expCustom:'Ngày cụ thể…', expiryDateLabel:'Chọn ngày & giờ hết hạn', errExpiryFuture:'Ngày hết hạn phải ở tương lai.', errExpiryNeeded:'Hãy chọn ngày hết hạn.', expiresOn:'Hết hạn', mapClickAdd:'Nhấn để thêm điểm · kéo để di chuyển bản đồ', mapDragOwner:'Nhấn / kéo để đặt vị trí của bạn', mapPickViewer:'Nhấn lên bản đồ để chọn điểm bắt đầu', mapPan:'Kéo để di chuyển · lăn chuột để phóng to' },
       en:{ tagline:'Private map · real-time', homeTitle:'Share your location on', homeTitleAccent:'your own map', homeSub:'Create a private map session from any image, draw the roads, pin a location and share via a link. Viewers pick their own start point and get instant directions.', createBtn:'Create session', demoBtn:'Quick demo', homeNote:'A private link is not absolute security — anyone with the link can view the session. Data is stored in this browser and synced across tabs sharing the same link.', backHome:'Back home',
@@ -2173,6 +2259,7 @@ class Component extends DCLogic {
         viewerTitle:'Viewer', viewerTitleEn:'Người xem', sessActive:'Session active', sessExpiring:'Session expiring soon', ownerReady:'Owner pinned a location', ownerWaiting:'Owner has not set a position yet…', pick:'Choose my location', picking:'Click the map…', useGps:'Use GPS location', findRoute:'Get directions', clearRoute:'Clear route', distance:'Estimated distance', hops:'points on route', pickHint:'Click the map to set your start point.',
         errNoOwner:'Owner has not set a position.', errNoViewer:'Choose your start location first.', errNoGraph:'The map needs at least 2 connected nodes.', errNoPath:'No route found between the two points.', needOwnerPos:'Set the owner position first.', viewerOpened:'Viewer tab opened', demoReady:'Demo ready — draw roads, then hit "Create share link" to save & share', pickHint2:'', nodeOnEdge:'Node inserted onto the existing edge', undo:'Undo', redo:'Redo', toolPen:'Pen (draw roads)', penHint:'Draw continuous roads by clicking', penOn:'Active — click to turn off', penHelp:'Click the map to start drawing. Each click adds a node and links it to the previous one.', penContinue:'Keep clicking to extend the road · click the last point (or Esc) to finish.', saveMap:'Save map', loadMap:'Load map', mapSaved:'Map saved to a JSON file', mapLoaded:'Map loaded from file', badFile:'Invalid file', copyFail:'Link selected — press Ctrl/Cmd+C to copy', storageFull:'Image too large to sync across tabs.', syncFail:'Could not save the session to the server — check your connection and retry.', gpsUnavailable:'Map is not georeferenced, GPS unavailable — pick manually.',
         loadingTitle:'Loading session…', loadingMsg:'Fetching session data from the server, please wait.',
+        pwTitle:'Protected session', pwSubtitle:'Enter the password set by the owner to view this map.', pwPlaceholder:'Enter password…', pwSubmit:'Open session', pwEmpty:'Please enter the password.', pwWrong:'Incorrect password. Try again.',
         notfoundTitle:'Session not found', notfoundMsg:'The link is invalid or the session was deleted.', expiredTitle:'Session expired', expiredMsg:'This session is past its lifetime and can no longer be accessed.', deniedTitle:'Access denied', deniedMsg:'Invalid admin token. You cannot edit this session.', endedTitle:'Session ended', endedMsg:'The owner has ended this session.',
         expNever:'Never', min15:'15 minutes', min60:'1 hour', min240:'4 hours', min1440:'24 hours', min10080:'7 days', min43200:'30 days', expCustom:'Specific date…', expiryDateLabel:'Pick expiry date & time', errExpiryFuture:'Expiry must be in the future.', errExpiryNeeded:'Please pick an expiry date.', expiresOn:'Expires', mapClickAdd:'Click to add nodes · drag to pan', mapDragOwner:'Click / drag to set your position', mapPickViewer:'Click the map to set your start point', mapPan:'Drag to pan · scroll to zoom' },
     };
@@ -2224,6 +2311,7 @@ class Component extends DCLogic {
     const isViewer = st.screen === 'viewer';
     const isLogin = st.screen === 'login';
     const isDashboard = st.screen === 'dashboard';
+    const isPassword = st.screen === 'password';
     const isError = ['notfound','expired','denied','ended','loading'].includes(st.screen);
     const showMap = isCreate || isGraph || isOwner || isViewer;
     const panelIsSheet = st.isMobile && showMap;
@@ -2231,7 +2319,7 @@ class Component extends DCLogic {
     let bodyLayout = "flex:1;min-height:0;display:flex;";
     if(st.isMobile) bodyLayout += "position:relative;"; // map chiếm toàn bộ, panel là sheet phủ lên
     let panelStyle;
-    if(isHome || isError || isLogin || isDashboard){ panelStyle = "flex:1;overflow-y:auto;"; }
+    if(isHome || isError || isLogin || isDashboard || isPassword){ panelStyle = "flex:1;overflow-y:auto;"; }
     else if(panelIsSheet){
       // Mobile: bảng điều khiển là bottom-sheet trượt lên, ẩn đi để map hiện full.
       const base = "position:absolute;left:0;right:0;bottom:0;height:54vh;max-height:calc(100% - 12px);background:#fff;border-radius:22px 22px 0 0;box-shadow:0 -10px 34px rgba(15,23,42,.24);overflow:hidden;z-index:46;display:flex;flex-direction:column;padding-top:20px;transition:transform .3s cubic-bezier(.4,0,.2,1);will-change:transform;";
@@ -2346,7 +2434,13 @@ class Component extends DCLogic {
       statusDot: (st.expiresAt && st.expiresAt-st.now<5*60000)?'#dc2626':'#16a34a',
       statusGlow: (st.expiresAt && st.expiresAt-st.now<5*60000)?'rgba(220,38,38,.2)':'rgba(22,163,74,.2)',
       // screens
-      isHome, isCreate, isGraph, isOwner, isViewer, isError, showMap, isLogin, isDashboard,
+      isHome, isCreate, isGraph, isOwner, isViewer, isError, showMap, isLogin, isDashboard, isPassword,
+      // password gate (viewer)
+      pwTitle:s.pwTitle, pwSubtitle:s.pwSubtitle, pwPlaceholder:s.pwPlaceholder,
+      pwInput:st.pwInput, pwError:st.pwError,
+      pwSubmitLabel: st.pwBusy ? '…' : s.pwSubmit,
+      onViewerPw:(e)=>this.onViewerPw(e),
+      submitViewerPw:(e)=>{ if(e&&e.preventDefault)e.preventDefault(); this.submitViewerPw(); },
       // ---- tài khoản & bảng quản lý ----
       user: st.user, isLoggedIn: !!st.user, isLoggedOut: !st.user, userName: st.user ? st.user.username : '',
       userInitial: st.user && st.user.username ? st.user.username.charAt(0) : '?',

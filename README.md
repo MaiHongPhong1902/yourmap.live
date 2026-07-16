@@ -58,6 +58,8 @@ Sau đó mở trình duyệt tại **http://localhost:3000**.
 | `UPLOAD_DIR`   | `./uploads`  | Nơi lưu ảnh bản đồ được upload            |
 | `MAX_UPLOAD_MB`| `10`         | Giới hạn dung lượng ảnh upload (MB)       |
 | `AUTH_SECRET`  | *(tự sinh)*  | Khóa ký token đăng nhập. Nếu bỏ trống, tự sinh & lưu `data/.authsecret`. Đặt cố định khi chạy nhiều tiến trình/instance. |
+| `TRUST_PROXY`  | `loopback`   | Cấu hình `trust proxy` của Express. Mặc định chỉ tin proxy loopback (nginx cùng máy) để client ngoài không giả mạo `X-Forwarded-For` né rate-limit. Đặt `true` nếu đứng sau proxy tin cậy khác, hoặc `false` khi expose trực tiếp. |
+| `WS_MAX_PER_IP`| `60`         | Trần số kết nối WebSocket đồng thời cho mỗi IP (chống cạn socket). |
 
 > Tài khoản người dùng lưu ở `data/users.json` (mật khẩu băm bằng scrypt).
 > Cần **đăng nhập để tạo phiên**; người xem mở link không cần đăng nhập.
@@ -102,10 +104,19 @@ cd deploy/digitalocean && ./create-droplet.sh
 
 ### Mô hình bảo mật
 
-Giống bản gốc: **ai có link người xem đều xem được phiên**. Điểm khác biệt an toàn
-hơn: các lệnh đặc quyền qua WebSocket (`owner` / `graph` / `end`) chỉ được chấp
-nhận từ kết nối có **owner token hợp lệ** (xác thực bằng cùng thuật toán băm
-`cyrb53` với frontend). Owner token nằm trong link chủ phiên — **giữ bí mật**.
+Mặc định **ai có link người xem đều xem được phiên** — trừ khi chủ phiên **đặt
+mật khẩu**: khi đó người xem phải nhập đúng mật khẩu thì server mới trả nội dung
+phiên (`GET`) và cho mở kênh realtime (`WS`). Chủ phiên (có owner token) không cần
+mật khẩu. Các điểm an toàn khác:
+
+- Lệnh đặc quyền qua WebSocket (`owner` / `graph` / `end`) chỉ chấp nhận từ kết nối
+  có **owner token hợp lệ** (băm `cyrb53` khớp frontend). Owner token nằm trong link
+  chủ phiên — **giữ bí mật**.
+- WebSocket chỉ nhận các loại message đã biết, có **rate-limit theo socket** và
+  **trần kết nối theo IP** (`WS_MAX_PER_IP`) để chống flood/cạn tài nguyên.
+- **Upload ảnh cần đăng nhập** — tránh người ẩn danh spam làm đầy đĩa.
+- Người xem mở link vào phiên đã **kết thúc/hết hạn/xóa** sẽ bị chặn (kể cả khi còn
+  bản cache cũ, app tự làm tươi trạng thái từ server).
 
 ## Lab: bản đồ thật miễn phí (thử nghiệm)
 

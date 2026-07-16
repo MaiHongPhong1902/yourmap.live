@@ -60,6 +60,11 @@ const MAX_EDGES = 20000;
 const MAX_LABELS = 2000;
 const MAX_MAPIMAGE_LEN = 14_000_000; // ~14MB ký tự — đủ cho data URL (ảnh nhúng khi "Tải bản đồ"/fallback upload), khớp giới hạn JSON 20MB & hạn upload 10MB
 const WS_MAX_PAYLOAD = 2 * 1024 * 1024; // 2MB mỗi message WebSocket
+const WS_MAX_PER_IP = parseInt(process.env.WS_MAX_PER_IP || '60', 10); // trần kết nối/1 IP (chống cạn socket)
+const WS_MSG_WINDOW_MS = 10 * 1000;  // cửa sổ đo tần suất message
+const WS_MSG_MAX = 240;              // tối đa ~24 msg/giây mỗi socket rồi bỏ bớt (chống flood)
+// Chỉ các loại message này được chấp nhận/chuyển tiếp qua phòng realtime.
+const WS_ALLOWED_TYPES = new Set(['ping', 'pong', 'bye', 'owner', 'graph', 'end']);
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -85,6 +90,18 @@ function safeEqual(a, b) {
 function isOwnerToken(session, ownerToken) {
   if (!session || !ownerToken || !session.ownerTokenHash) return false;
   return safeEqual(cyrb53(String(ownerToken)), session.ownerTokenHash);
+}
+
+/** Phiên có yêu cầu mật khẩu để người xem truy cập không? */
+function sessionNeedsPassword(session) {
+  return !!(session && session.hasPassword && session.passwordHash);
+}
+
+/** So khớp mật khẩu (đã hash cùng cyrb53 như frontend), constant-time. */
+function passwordMatches(session, provided) {
+  if (!sessionNeedsPassword(session)) return true;
+  if (provided == null || provided === '') return false;
+  return safeEqual(cyrb53(String(provided)), session.passwordHash);
 }
 
 /** Cắt mảng an toàn: chỉ nhận Array, giới hạn số phần tử. */
@@ -157,6 +174,22 @@ function viewerCountOf(token) {
   return n;
 }
 
+/** Giải mã cấu hình TRUST_PROXY từ env sang giá trị Express hiểu được. */
+function parseTrustProxy(v) {
+  if (v == null || v === '') return 'loopback';
+  const s = String(v).trim();
+  if (s === 'true') return true;
+  if (s === 'false') return false;
+  if (/^\d+$/.test(s)) return parseInt(s, 10);
+  // Danh sách IP/subnet hoặc từ khóa (loopback, linklocal, uniquelocal…).
+  return s.includes(',') ? s.split(',').map((x) => x.trim()).filter(Boolean) : s;
+}
+
+/** decodeURIComponent an toàn — chuỗi %-encoding hỏng không làm sập request. */
+function safeDecodeURIComponent(s) {
+  try { return decodeURIComponent(s); } catch (e) { return s; }
+}
+
 // ---- cookie / auth helpers ----
 function parseCookies(req) {
   const out = {};
@@ -165,7 +198,7 @@ function parseCookies(req) {
   for (const part of raw.split(';')) {
     const i = part.indexOf('=');
     if (i < 0) continue;
-    out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    out[part.slice(0, i).trim()] = safeDecodeURIComponent(part.slice(i + 1).trim());
   }
   return out;
 }
@@ -203,7 +236,10 @@ function publicUser(u) { return u ? { id: u.id, username: u.username } : null; }
 // ----------------------------------------------------------------------------
 const app = express();
 app.disable('x-powered-by');
-app.set('trust proxy', true); // sau nginx: đọc đúng X-Forwarded-Proto
+// Trust proxy có kiểm soát: mặc định chỉ tin proxy loopback (nginx trên cùng máy)
+// để client bên ngoài KHÔNG giả mạo được X-Forwarded-For nhằm né rate-limit.
+// Ghi đè bằng env TRUST_PROXY khi cần: "true"/"false", số hop, hoặc danh sách IP/subnet.
+app.set('trust proxy', parseTrustProxy(process.env.TRUST_PROXY));
 app.use(express.json({ limit: '20mb' })); // đủ chỗ cho mapImage dạng data URL (fallback upload / ảnh nhúng khi "Tải bản đồ")
 app.use('/api', (req, res, next) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -376,11 +412,22 @@ app.post('/api/sessions', (req, res) => {
 app.get('/api/sessions/:token', (req, res) => {
   const sess = store.get(req.params.token);
   if (!sess) return res.status(404).json({ error: 'not found' });
-  const pub = Object.assign({}, sess);
   // Xác thực owner ở phía server (constant-time) và chỉ trả về cờ boolean —
   // KHÔNG lộ ownerTokenHash. cyrb53 là hash nhanh (~53-bit); nếu lộ hash, kẻ tấn
   // công có thể brute-force/giả mạo owner token và chiếm phiên.
-  pub.isOwner = isOwnerToken(sess, req.query.ot);
+  const isOwner = isOwnerToken(sess, req.query.ot);
+  // Cổng mật khẩu: người xem (không phải owner) phải cung cấp đúng mật khẩu.
+  // Không lộ nội dung phiên cho tới khi xác thực — chỉ báo cần mật khẩu.
+  if (!isOwner && sessionNeedsPassword(sess)) {
+    const provided = req.query.pw != null
+      ? String(req.query.pw)
+      : safeDecodeURIComponent(req.get('x-session-password') || '');
+    if (!passwordMatches(sess, provided)) {
+      return res.status(401).json({ error: 'password_required', passwordRequired: true });
+    }
+  }
+  const pub = Object.assign({}, sess);
+  pub.isOwner = isOwner;
   delete pub.ownerUserId; delete pub.passwordHash; delete pub.ownerToken; delete pub.ownerTokenHash;
   res.json(pub);
 });
@@ -405,7 +452,12 @@ app.put('/api/sessions/:token', (req, res) => {
 });
 
 // Upload ảnh bản đồ → trả về URL tương đối để lưu vào session (tránh phình JSON).
-app.post('/api/upload', upload.single('image'), (req, res) => {
+// Yêu cầu đăng nhập & kiểm tra TRƯỚC multer để kẻ ẩn danh không ghi file lên đĩa
+// (chống làm đầy ổ đĩa bằng upload spam).
+app.post('/api/upload', (req, res, next) => {
+  if (!currentUser(req)) return res.status(401).json({ error: 'unauthorized' });
+  next();
+}, upload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'no file' });
   res.status(201).json({ url: '/uploads/' + req.file.filename, size: req.file.size });
 });
@@ -436,6 +488,12 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: WS_MAX_PAYLOAD });
 
 // Mỗi token → tập các socket đang kết nối.
 const rooms = new Map();
+// Đếm số kết nối WS đang mở theo IP để chặn cạn kiệt tài nguyên.
+const wsIpCounts = new Map();
+
+function wsClientIp(req) {
+  return (req.socket && req.socket.remoteAddress) || 'unknown';
+}
 
 function roomOf(token) {
   let set = rooms.get(token);
@@ -465,9 +523,23 @@ server.on('upgrade', (req, socket, head) => {
   const session = store.get(token);
   if (!session) { socket.destroy(); return; }
   const isOwner = isOwnerToken(session, query.ot);
+  // Không cho người xem kết nối realtime vào phiên đã kết thúc/hết hạn.
+  if (!isOwner) {
+    if (session.status === 'ended') { socket.destroy(); return; }
+    if (session.expiresAt && Date.now() > session.expiresAt) { socket.destroy(); return; }
+    // Cổng mật khẩu cho người xem.
+    if (sessionNeedsPassword(session) && !passwordMatches(session, query.pw)) {
+      socket.destroy(); return;
+    }
+  }
+  // Trần kết nối theo IP.
+  const ip = wsClientIp(req);
+  if ((wsIpCounts.get(ip) || 0) >= WS_MAX_PER_IP) { socket.destroy(); return; }
   wss.handleUpgrade(req, socket, head, (ws) => {
     ws.token = token;
     ws.isOwner = isOwner;
+    ws._ip = ip;
+    wsIpCounts.set(ip, (wsIpCounts.get(ip) || 0) + 1);
     wss.emit('connection', ws, req);
   });
 });
@@ -476,10 +548,20 @@ wss.on('connection', (ws) => {
   const token = ws.token;
   roomOf(token).add(ws);
 
+  ws._msgWindowStart = Date.now();
+  ws._msgCount = 0;
+
   ws.on('message', (raw) => {
+    // Rate-limit theo socket: chống flood message làm cạn CPU/băng thông.
+    const now = Date.now();
+    if (now - ws._msgWindowStart > WS_MSG_WINDOW_MS) { ws._msgWindowStart = now; ws._msgCount = 0; }
+    if (++ws._msgCount > WS_MSG_MAX) return;
+
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch (e) { return; }
     if (!msg || typeof msg.type !== 'string') return;
+    // Chỉ chấp nhận/chuyển tiếp các loại message đã biết (chống khuếch đại fan-out).
+    if (!WS_ALLOWED_TYPES.has(msg.type)) return;
 
     // owner/graph/end chỉ được chấp nhận từ kết nối có owner token hợp lệ.
     // Điều này chặt hơn bản BroadcastChannel gốc (nơi tab nào cũng gửi được).
@@ -503,11 +585,19 @@ wss.on('connection', (ws) => {
     broadcast(token, msg, ws);
   });
 
+  let cleaned = false;
   const cleanup = () => {
+    if (cleaned) return; // close + error có thể cùng bắn → chỉ giảm bộ đếm 1 lần
+    cleaned = true;
     const set = rooms.get(token);
     if (set) {
       set.delete(ws);
       if (set.size === 0) rooms.delete(token);
+    }
+    const ip = ws._ip;
+    if (ip != null) {
+      const n = (wsIpCounts.get(ip) || 1) - 1;
+      if (n <= 0) wsIpCounts.delete(ip); else wsIpCounts.set(ip, n);
     }
   };
   ws.on('close', cleanup);
